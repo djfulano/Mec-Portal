@@ -20,10 +20,10 @@ async function migrate() {
     console.log('\nMigration 014 concluida com sucesso!');
   } catch (err) {
     console.error('Erro na migration 014:', err);
-    throw err;
+    process.exitCode = 1;
   } finally {
     conn.release();
-    process.exit(0);
+    await db.end();
   }
 }
 

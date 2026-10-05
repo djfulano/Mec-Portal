@@ -57,10 +57,10 @@ async function migrate() {
   } catch (err) {
     await conn.rollback();
     console.error('Erro na migration 010:', err);
-    throw err;
+    process.exitCode = 1;
   } finally {
     conn.release();
-    process.exit(0);
+    await db.end();
   }
 }
 
