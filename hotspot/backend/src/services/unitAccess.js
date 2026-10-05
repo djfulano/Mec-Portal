@@ -10,15 +10,13 @@ async function scope(req) {
     "SELECT role FROM admin_empresas WHERE admin_id=? AND empresa_id=?",
     [req.user.id, req.empresa_id],
   );
-  const all = admin.role === "super_admin" || link?.role === "owner";
-  if (!all && !link) throw fail(403, "Sem acesso à empresa.");
+  const owner = admin.role === "super_admin" || link?.role === "owner";
+  if (!owner && !link) throw fail(403, "Sem acesso à empresa.");
   const [units] = await db.query(
-    all
-      ? "SELECT id FROM unidades WHERE empresa_id=?"
-      : "SELECT u.id FROM unidades u JOIN admin_unidades au ON au.unidade_id=u.id WHERE u.empresa_id=? AND au.admin_id=?",
-    all ? [req.empresa_id] : [req.empresa_id, req.user.id],
+    "SELECT id FROM unidades WHERE empresa_id=?",
+    [req.empresa_id],
   );
-  return { all, ids: units.map((u) => u.id) };
+  return { all: true, owner, ids: units.map((u) => u.id) };
 }
 async function middleware(req, res, next) {
   try {
@@ -29,7 +27,7 @@ async function middleware(req, res, next) {
   }
 }
 function requireOwner(req) {
-  if (!req.unitScope.all)
+  if (!req.unitScope.owner)
     throw fail(403, "Esta configuração exige administrador da empresa.");
 }
 async function unit(req, id) {

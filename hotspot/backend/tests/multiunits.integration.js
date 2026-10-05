@@ -89,17 +89,18 @@ const messages = [];
           process.env.JWT_SECRET,
         ),
       );
+      const [placeholder] = await db.query("INSERT INTO portais(empresa_id,nome,slug,tipo,managed) VALUES (?, 'Inicial',?,'custom',1)",[co.insertId,"initial-"+i]);
       const us = [];
       for (let j = 0; j < 2; j++) {
-        const u = await ok("/api/workspace/units", owners[i], {
-          nome: "Unidade " + j,
-        });
+        const [unitRow] = await db.query("INSERT INTO unidades(empresa_id,nome) VALUES (?,?)",[co.insertId,"Contexto técnico "+j]);
+        const u = {id:unitRow.insertId};
         us.push(u.id);
         const [d] = await db.query(
-          "INSERT INTO mikrotiks(empresa_id,unidade_id,nome,ip,usuario,senha,porta,end_hotspot) VALUES (?,?,?,?,?,?,8728,?)",
+          "INSERT INTO mikrotiks(empresa_id,unidade_id,portal_id,nome,ip,usuario,senha,porta,end_hotspot) VALUES (?,?,?,?,?,?,?,8728,?)",
           [
             co.insertId,
             u.id,
+            placeholder.insertId,
             "Equipamento " + j,
             `198.18.${i}.${j + 1}`,
             "test",
@@ -123,23 +124,18 @@ const messages = [];
       { id: restricted.insertId, empresa_id: companies[0], role: "operator" },
       process.env.JWT_SECRET,
     );
-    await ok(
-      "/api/workspace/users/" + restricted.insertId + "/units",
-      owners[0],
-      { unit_ids: [units[0][0]] },
-      "PUT",
-    );
     const own = await ok("/api/workspace/overview", rt);
-    assert.equal(own.units.length, 1);
-    assert.equal(own.devices.length, 1);
-    assert.equal((await request("/api/leads", rt)).status, 403);
+    assert.equal(own.units.length, 2);
+    assert.equal(own.devices.length, 2);
+    assert.equal((await request("/api/leads", rt)).status, 200);
     assert.equal(
       (await request("/api/workspace/units", rt, { nome: "Bloqueada" })).status,
-      403,
+      410,
     );
     const p = await ok("/api/workspace/portals", owners[0], {
       nome: "Wi-Fi Mercado",
     });
+    await db.query("UPDATE mikrotiks SET portal_id=? WHERE empresa_id=?",[p.id,companies[0]]);
     const c = P.defaults();
     c.unit_ids = units[0];
     c.equipment_ids = devices
@@ -164,7 +160,7 @@ const messages = [];
     );
     assert.equal(
       (await request("/api/workspace/portals/" + p.id, rt)).status,
-      403,
+      200,
     );
     const rev = await ok(
       "/api/workspace/portals/" + p.id + "/publish",
@@ -344,6 +340,7 @@ const messages = [];
     const wp = await ok("/api/workspace/portals", owners[0], {
       nome: "WhatsApp",
     });
+    await db.query("UPDATE mikrotiks SET portal_id=? WHERE id=?",[wp.id,devices[0].id]);
     await ok(
       "/api/workspace/portals/" + wp.id + "/draft",
       owners[0],
@@ -554,7 +551,7 @@ const messages = [];
     assert.equal(
       (await request("/api/workspace/records/logs?unit_id=" + units[0][1], rt))
         .status,
-      403,
+      200,
     );
     const exportCsv = await request(
       "/api/workspace/records/logs?export=csv",
@@ -627,7 +624,7 @@ const messages = [];
     );
     assert(audits.total > 0);
     console.log(
-      "OK: duas empresas, unidades, permissões, publicação, clonagem, cadastro compartilhado/separado, privacidade, OTP, PIX idempotente e histórico RADIUS.",
+      "OK: duas empresas, contextos técnicos, acesso por empresa, publicação, clonagem, cadastro compartilhado/separado, privacidade, OTP, PIX idempotente e histórico RADIUS.",
     );
   } finally {
     if (server) await new Promise((r) => server.close(r));

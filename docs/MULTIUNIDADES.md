@@ -60,3 +60,7 @@ A migração 018 cria a unidade inicial e associa os equipamentos existentes, pr
 O teste `backend/tests/multiunits.integration.js` exige banco isolado com prefixo `mec_validation_`. Ele exercita empresas distintas, permissões, clonagem, versões, cadastros, privacidade, códigos, pagamentos simulados e registros RADIUS. Não envia mensagens nem efetua cobranças reais.
 
 MikroTik é o primeiro conector. Outras marcas, vouchers e login social não fazem parte desta versão. Antes de produção, validar em MikroTik real o redirecionamento, RADIUS, MAC/NAS, limites de banda e tempo, contabilização e a coleta de NAT da rede. Também homologar WhatsApp e Mercado Pago com as contas da operação.
+# Organização atual
+
+A partir da versão 0.2.0, o fluxo é **Operadora MEC Solution → Empresas → Portais → Equipamentos**. Consulte [ORGANIZACAO.md](ORGANIZACAO.md). As instruções de unidades abaixo documentam a versão 0.1.0 e não representam o fluxo atual de cadastro.
+

@@ -1,8 +1,4 @@
 const db = require("../../db");
-const {
-  DEFAULT_WHATSAPP_TEMPLATE,
-  DEFAULT_PORTAL_PLANOS_CONFIG,
-} = require("../constants/whatsappDefaults");
 
 function gerarSlug(nome) {
   return nome
@@ -19,7 +15,9 @@ exports.listarEmpresas = async (req, res) => {
       SELECT e.*,
         (SELECT COUNT(*) FROM admins WHERE empresa_id = e.id) AS total_admins,
         (SELECT COUNT(*) FROM mikrotiks WHERE empresa_id = e.id) AS total_mikrotiks,
-        (SELECT COUNT(*) FROM planos WHERE empresa_id = e.id) AS total_planos
+        (SELECT COUNT(*) FROM planos WHERE empresa_id = e.id) AS total_planos,
+        (SELECT COUNT(*) FROM portais WHERE empresa_id = e.id) AS total_portais,
+        'MEC Solution' AS operadora_nome
       FROM empresas e
       ORDER BY e.criado_em DESC
     `);
@@ -56,35 +54,8 @@ exports.criarEmpresa = async (req, res) => {
     const empresaId = result.insertId;
     await db.query("INSERT INTO unidades(empresa_id,nome) VALUES (?,?)", [
       empresaId,
-      "Unidade principal",
+      nome,
     ]);
-
-    // Auto-criar portais padrao para a nova empresa.
-    // O portal 'planos' ja vem com configuracoes padrao (PIX + Cartao ativos +
-    // trial de 5min habilitado). Os outros 4 nao usam essas configuracoes.
-    // Todos vem com template WhatsApp preenchido pra disparar ao liberar acesso.
-    const planosConfigJson = JSON.stringify(DEFAULT_PORTAL_PLANOS_CONFIG);
-    await db.execute(
-      `INSERT INTO portais (empresa_id, nome, slug, tipo, url_redirect, ativo, whatsapp_template, configuracoes) VALUES
-       (?, 'LGPD - Coleta de Dados', 'lgpd', 'lgpd', '/cadastro', 1, ?, NULL),
-       (?, 'Planos - Pagamento', 'planos', 'planos', '/planos-cliente', 1, ?, ?),
-       (?, 'Cadastro de LEAD', 'lead', 'lead', '/lead', 1, ?, NULL),
-       (?, 'Cadastro de LEAD (Sem Internet)', 'lead-passivo', 'lead_passivo', '/lead-passivo', 1, ?, NULL),
-       (?, 'Acesso Wi-Fi', 'login', 'login', '/login-hotspot', 1, ?, NULL)`,
-      [
-        empresaId,
-        DEFAULT_WHATSAPP_TEMPLATE,
-        empresaId,
-        DEFAULT_WHATSAPP_TEMPLATE,
-        planosConfigJson,
-        empresaId,
-        DEFAULT_WHATSAPP_TEMPLATE,
-        empresaId,
-        DEFAULT_WHATSAPP_TEMPLATE,
-        empresaId,
-        DEFAULT_WHATSAPP_TEMPLATE,
-      ],
-    );
 
     res.status(201).json({ id: empresaId, nome, slug, email });
   } catch (err) {

@@ -19,6 +19,8 @@ const wrap = (fn) => async (req, res) => {
 router.use(A.middleware);
 router.use((req, res, next) => {
   const path = req.path;
+  if (path === "/overview") return next();
+  if (path === "/units" || /^\/units\/\d+$/.test(path) || /^\/users\/\d+\/units$/.test(path) || /^\/devices\/\d+\/unit$/.test(path)) return res.status(410).json({message:"Unidades não fazem parte desta organização. Use empresa, portal e equipamento."});
   const module = path.startsWith("/portals")
     ? "portais"
     : path.startsWith("/records/logs") ||
@@ -75,7 +77,7 @@ router.get(
       }
     }
     const [[company]] = await db.query(
-      "SELECT cadastro_compartilhado FROM empresas WHERE id=?",
+      "SELECT nome,cadastro_compartilhado FROM empresas WHERE id=?",
       [req.empresa_id],
     );
     const [plans] = await db.query(
@@ -87,7 +89,9 @@ router.get(
       devices,
       portals,
       plans,
-      all_units: req.unitScope.all,
+      all_units: req.unitScope.owner,
+      operator: "MEC Solution",
+      company_name: company.nome,
       cadastro_compartilhado: !!company.cadastro_compartilhado,
       connectors,
     });
@@ -368,6 +372,12 @@ router.post(
     res.status(201).json({ id: r.insertId });
   }),
 );
+async function normalizeEquipment(req, portalId, config, query = db) {
+  const [units] = await query.query('SELECT id FROM unidades WHERE empresa_id=? ORDER BY id',[req.empresa_id]);
+  const [devices] = await query.query('SELECT id FROM mikrotiks WHERE empresa_id=? AND portal_id=?',[req.empresa_id,portalId]);
+  config.unit_ids = units.map(u=>u.id);
+  config.equipment_ids = devices.map(d=>d.id);
+}
 async function validateLinks(req, c, query = db) {
   for (const id of c.unit_ids) {
     const u = await A.unit(req, id);
@@ -397,6 +407,7 @@ router.put(
   wrap(async (req, res) => {
     const p = await A.portal(req, req.params.id),
       c = P.validate(req.body.config);
+    await normalizeEquipment(req, p.id, c);
     await validateLinks(req, c);
     const tx = await db.getConnection();
     try {
@@ -465,6 +476,7 @@ router.post(
       );
       const c = P.validate(P.json(p.draft_config), true);
       delete c.legacy;
+      await normalizeEquipment(req, p.id, c, tx);
       await validateLinks(req, c, tx);
       if (c.auth.whatsapp) {
         const {
@@ -477,11 +489,6 @@ router.post(
             "Configure o WhatsApp da empresa antes de publicar este método.",
           );
       }
-      if (!c.unit_ids.length || !c.equipment_ids.length)
-        throw A.fail(
-          400,
-          "Vincule uma unidade e um equipamento antes de publicar.",
-        );
       for (const id of c.equipment_ids) {
         const [[d]] = await tx.query(
           "SELECT portal_id FROM mikrotiks WHERE id=? FOR UPDATE",
@@ -498,14 +505,6 @@ router.post(
         "INSERT INTO portal_revisions(portal_id,numero,config,publicado_por) VALUES (?,?,?,?)",
         [p.id, num.numero, JSON.stringify(c), req.user.id],
       );
-      await tx.query("UPDATE mikrotiks SET portal_id=NULL WHERE portal_id=?", [
-        p.id,
-      ]);
-      for (const id of c.equipment_ids)
-        await tx.query(
-          "UPDATE mikrotiks SET portal_id=? WHERE id=? AND empresa_id=?",
-          [p.id, id, req.empresa_id],
-        );
       await tx.query("DELETE FROM portal_unidades WHERE portal_id=?", [p.id]);
       for (const id of c.unit_ids)
         await tx.query("INSERT INTO portal_unidades VALUES (?,?)", [p.id, id]);

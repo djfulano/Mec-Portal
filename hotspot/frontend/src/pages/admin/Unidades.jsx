@@ -6,7 +6,7 @@ import {
   inputClass,
   buttonClass,
 } from "../../components/admin/workspaceApi";
-export default function Unidades({ initialTab = "Unidades" }) {
+export default function Unidades({ initialTab = "Portais" }) {
   const { empresaSlug } = useParams();
   const base = "/admin/" + empresaSlug;
   const [data, setData] = useState(null),
@@ -74,10 +74,10 @@ export default function Unidades({ initialTab = "Unidades" }) {
       window.location.href = base + "/portais/" + p.id + "/configurar";
     });
   const tabs = [
-    "Unidades",
     "Portais",
+    "Equipamentos",
     ...Object.keys(categories),
-    ...(data?.all_units ? ["Permissões", "Privacidade"] : []),
+    ...(data?.all_units ? ["Privacidade"] : []),
   ];
   const download = async () => {
     try {
@@ -107,9 +107,9 @@ export default function Unidades({ initialTab = "Unidades" }) {
     <AdminLayout>
       <div className="max-w-6xl mx-auto space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-white">Unidades e portais</h1>
+          <h1 className="text-3xl font-bold text-white">Portais e equipamentos</h1>
           <p className="text-gray-400 mt-2">
-            Gerencie os locais, o acesso Wi-Fi e os visitantes da sua empresa.
+            MEC Solution → {data?.company_name || "Empresa"} → Portais → Equipamentos
           </p>
         </div>
         {error && (
@@ -140,194 +140,12 @@ export default function Unidades({ initialTab = "Unidades" }) {
           <p>Carregando…</p>
         ) : (
           <>
-            {tab === "Unidades" && (
-              <>
-                <div className="flex justify-between items-center">
-                  {data.all_units && (
-                    <button
-                      className={buttonClass}
-                      disabled={busy}
-                      onClick={() =>
-                        act(async () => {
-                          const nome = prompt("Nome da unidade");
-                          if (nome) await workspace("/units", { nome });
-                        })
-                      }
-                    >
-                      + Nova unidade
-                    </button>
-                  )}
-                  <span className="text-sm text-gray-400">
-                    {data.units.length} unidades
-                  </span>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {data.units.map((u) => (
-                    <section
-                      key={u.id}
-                      className="p-5 rounded-xl bg-[#1a1d27] border border-gray-800"
-                    >
-                      <div className="flex justify-between">
-                        <h2 className="text-lg font-semibold text-white">
-                          {u.nome}
-                        </h2>
-                        <span className="text-xs text-gray-400">
-                          {u.ativo ? "Ativa" : "Inativa"}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-400">
-                        {u.endereco || "Endereço não informado"}
-                      </p>
-                      <p className="my-3 text-sm">
-                        {u.equipamentos} equipamentos
-                      </p>
-                      {data.all_units && (
-                        <div className="flex gap-3 text-sm">
-                          <button
-                            onClick={() =>
-                              act(async () => {
-                                const nome = prompt("Nome", u.nome);
-                                if (nome === null) return;
-                                const endereco = prompt(
-                                  "Endereço",
-                                  u.endereco || "",
-                                );
-                                if (endereco === null) return;
-                                await workspace(
-                                  "/units/" + u.id,
-                                  { nome, endereco, ativo: !!u.ativo },
-                                  "PUT",
-                                );
-                              })
-                            }
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() =>
-                              act(() =>
-                                workspace(
-                                  "/units/" + u.id,
-                                  {
-                                    nome: u.nome,
-                                    endereco: u.endereco,
-                                    ativo: !u.ativo,
-                                  },
-                                  "PUT",
-                                ),
-                              )
-                            }
-                          >
-                            {u.ativo ? "Desativar" : "Ativar"}
-                          </button>
-                          <button
-                            className="text-blue-400"
-                            onClick={() =>
-                              act(async () => {
-                                const c = await workspace(
-                                  "/units/" + u.id + "/payment-config",
-                                );
-                                setPayment({ ...c, access_token: "" });
-                                setPaymentUnit(u);
-                              })
-                            }
-                          >
-                            Recebimentos
-                          </button>
-                        </div>
-                      )}
-                    </section>
-                  ))}
-                </div>
-                <section className="p-5 rounded-xl bg-[#1a1d27] border border-gray-800">
-                  <h2 className="text-lg font-semibold mb-4">Equipamentos</h2>
-                  {data.all_units && (
-                    <Link
-                      className="text-blue-400 text-sm"
-                      to={base + "/mikrotiks"}
-                    >
-                      Cadastrar e configurar MikroTik →
-                    </Link>
-                  )}
-                  {data.devices.map((d) => (
-                    <div
-                      key={d.id}
-                      className="flex flex-wrap gap-3 items-center py-3 border-b border-gray-800"
-                    >
-                      <span className="flex-1">
-                        {d.nome}
-                        <small className="block text-gray-500">
-                          MikroTik · {d.ip}
-                        </small>
-                      </span>
-                      {data.all_units ? (
-                        <select
-                          className={inputClass + " max-w-xs"}
-                          value={d.unidade_id || ""}
-                          onChange={(e) =>
-                            act(() =>
-                              workspace(
-                                "/devices/" + d.id + "/unit",
-                                { unidade_id: Number(e.target.value) },
-                                "PUT",
-                              ),
-                            )
-                          }
-                        >
-                          {data.units.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {u.nome}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span>
-                          {data.units.find((u) => u.id === d.unidade_id)?.nome}
-                        </span>
-                      )}
-                      {data.all_units && (
-                        <button
-                          title="Gerar chave para integração de registros NAT"
-                          className="text-xs text-blue-400"
-                          onClick={() =>
-                            act(async () => {
-                              const r = await workspace(
-                                "/devices/" + d.id + "/collector-key",
-                                {},
-                              );
-                              prompt(
-                                "Chave do coletor: copie e guarde. Não será exibida novamente.",
-                                r.key,
-                              );
-                            })
-                          }
-                        >
-                          Configurar coletor
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </section>
-                {data.all_units && (
-                  <label className="flex items-center gap-3 p-4 bg-[#1a1d27] rounded-lg">
-                    <input
-                      type="checkbox"
-                      checked={data.cadastro_compartilhado}
-                      onChange={(e) =>
-                        act(() =>
-                          workspace(
-                            "/company",
-                            { cadastro_compartilhado: e.target.checked },
-                            "PUT",
-                          ),
-                        )
-                      }
-                    />
-                    Compartilhar cadastro de visitantes entre unidades da
-                    empresa
-                  </label>
-                )}
-              </>
+            {tab === "Equipamentos" && (
+              <section className="p-5 rounded-xl bg-[#1a1d27] border border-gray-800 space-y-4">
+                <Link className="text-blue-400" to={base + "/mikrotiks"}>Cadastrar e configurar equipamentos →</Link>
+                {data.devices.map(d => <div key={d.id} className="border-t border-gray-800 pt-3"><strong>{d.nome}</strong><p className="text-sm text-gray-400">{d.ip} · Portal: {data.portals.find(p => p.id === d.portal_id)?.nome || "Não identificado"}</p></div>)}
+                {!data.devices.length && <p className="text-gray-400">Nenhum equipamento cadastrado. Crie um portal primeiro e selecione-o ao cadastrar o equipamento.</p>}
+              </section>
             )}
             {tab === "Portais" && (
               <>
@@ -391,18 +209,6 @@ export default function Unidades({ initialTab = "Unidades" }) {
             {categories[tab] && (
               <>
                 <div className="flex gap-3">
-                  <select
-                    className={inputClass + " max-w-xs"}
-                    value={unit}
-                    onChange={(e) => setUnit(e.target.value)}
-                  >
-                    <option value="">Todas as unidades autorizadas</option>
-                    {data.units.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.nome}
-                      </option>
-                    ))}
-                  </select>
                   <button className={buttonClass} onClick={download}>
                     Exportar CSV
                   </button>
@@ -423,8 +229,7 @@ export default function Unidades({ initialTab = "Unidades" }) {
                           {String(r.id).slice(0, 12)}
                         </strong>
                         <span>
-                          {data.units.find((u) => u.id === r.unidade_id)
-                            ?.nome || "Unidade não identificada"}
+                          {data.devices.find((d) => d.id === r.equipamento_id)?.nome || "Registro da empresa"}
                         </span>
                       </div>
                       {r.dados && (
@@ -506,51 +311,6 @@ export default function Unidades({ initialTab = "Unidades" }) {
                   )}
                 </div>
               </>
-            )}
-            {tab === "Permissões" && (
-              <div className="space-y-4">
-                {users.map((u) => (
-                  <section
-                    key={u.id}
-                    className="p-4 bg-[#1a1d27] rounded-xl border border-gray-800"
-                  >
-                    <strong>{u.email}</strong>
-                    {u.role === "owner" ? (
-                      <p className="text-sm text-gray-400">
-                        Administrador · todas as unidades
-                      </p>
-                    ) : (
-                      <div className="flex flex-wrap gap-4 mt-3">
-                        {data.units.map((unit) => (
-                          <label
-                            key={unit.id}
-                            className="flex items-center gap-2 text-sm"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={u.unit_ids.includes(unit.id)}
-                              onChange={(e) =>
-                                act(async () => {
-                                  const ids = e.target.checked
-                                    ? [...u.unit_ids, unit.id]
-                                    : u.unit_ids.filter((id) => id !== unit.id);
-                                  await workspace(
-                                    "/users/" + u.id + "/units",
-                                    { unit_ids: ids },
-                                    "PUT",
-                                  );
-                                  setUsers(await workspace("/users"));
-                                })
-                              }
-                            />
-                            {unit.nome}
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                ))}
-              </div>
             )}
             {tab === "Privacidade" && privacy && (
               <form

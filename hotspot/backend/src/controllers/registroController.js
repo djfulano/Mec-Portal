@@ -53,7 +53,7 @@ exports.registrarEmpresa = async (req, res) => {
     const empresaId = empresaResult.insertId;
     await conn.query("INSERT INTO unidades(empresa_id,nome) VALUES (?,?)", [
       empresaId,
-      "Unidade principal",
+      nome,
     ]);
 
     // Criar admin owner

@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.2.0",
+    "date": "2026-10-05",
+    "title": "Organização da operadora — versão de testes",
+    "changes": [
+      "MEC Solution como operadora única, com organização por empresas, portais e equipamentos.",
+      "Empresas novas começam sem portais automáticos.",
+      "Equipamento exige um portal da mesma empresa; cada portal aceita vários equipamentos.",
+      "Unidades retiradas do fluxo de cadastro e publicação."
+    ]
+  },
+  {
     "version": "0.1.0",
     "date": "2026-10-05",
     "title": "Versão de testes",

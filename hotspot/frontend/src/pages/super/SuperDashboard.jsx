@@ -38,8 +38,8 @@ export default function SuperDashboard() {
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white">Painel Super Admin</h1>
-            <p className="text-gray-500 mt-1">Gerenciamento da plataforma</p>
+            <h1 className="text-3xl font-bold text-white">Operadora MEC Solution</h1>
+            <p className="text-gray-500 mt-1">Gerencie as empresas, seus portais e equipamentos</p>
           </div>
           <div className="flex gap-3">
             {user?.empresa_id && <Link
@@ -64,7 +64,7 @@ export default function SuperDashboard() {
             <p className="text-3xl font-bold text-white mt-1">{empresas.length}</p>
           </div>
           <div className="bg-[#1a1d27] border border-gray-800 rounded-xl p-6">
-            <p className="text-gray-500 text-sm">Total de MikroTiks</p>
+            <p className="text-gray-500 text-sm">Total de equipamentos</p>
             <p className="text-3xl font-bold text-white mt-1">
               {empresas.reduce((acc, e) => acc + (e.total_mikrotiks || 0), 0)}
             </p>
@@ -108,8 +108,8 @@ export default function SuperDashboard() {
                 <tr className="border-b border-gray-800 text-gray-500">
                   <th className="text-left p-4">Empresa</th>
                   <th className="text-left p-4">Slug</th>
-                  <th className="text-center p-4">MikroTiks</th>
-                  <th className="text-center p-4">Planos</th>
+                  <th className="text-center p-4">Equipamentos</th>
+                  <th className="text-center p-4">Portais</th>
                   <th className="text-center p-4">Admins</th>
                   <th className="text-center p-4">Status</th>
                   <th className="text-center p-4">Ações</th>
@@ -121,7 +121,7 @@ export default function SuperDashboard() {
                     <td className="p-4 font-medium text-white">{e.nome}</td>
                     <td className="p-4 text-gray-400">{e.slug}</td>
                     <td className="p-4 text-center">{e.total_mikrotiks || 0}</td>
-                    <td className="p-4 text-center">{e.total_planos || 0}</td>
+                    <td className="p-4 text-center">{e.total_portais || 0}</td>
                     <td className="p-4 text-center">{e.total_admins || 0}</td>
                     <td className="p-4 text-center">
                       <span className={`px-2 py-1 rounded text-xs ${e.ativo ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>

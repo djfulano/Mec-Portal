@@ -4,16 +4,6 @@ import AdminLayout from "../../components/admin/AdminLayout";
 export default function Mikrotiks() {
   const [mikrotiks, setMikrotiks] = useState([]);
   const [portais, setPortais] = useState([]);
-  const [unidades, setUnidades] = useState([]);
-  useEffect(() => {
-    fetch("/api/workspace/overview", {
-      headers: {
-        Authorization: "Bearer " + localStorage.getItem("admin_token"),
-      },
-    })
-      .then((r) => r.json())
-      .then((d) => setUnidades(d.units || []));
-  }, []);
   const [showModal, setShowModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
@@ -600,36 +590,19 @@ export default function Mikrotiks() {
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400">Unidade</label>
-                <select
-                  required
-                  className="w-full bg-[#0d1117] border border-gray-700 text-white rounded px-3 py-2 mb-4"
-                  value={form.unidade_id || ""}
-                  onChange={(e) =>
-                    setForm({ ...form, unidade_id: Number(e.target.value) })
-                  }
-                >
-                  <option value="">Selecione a unidade</option>
-                  {unidades
-                    .filter((u) => u.ativo)
-                    .map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.nome}
-                      </option>
-                    ))}
-                </select>
-                <label className="text-sm text-gray-400">Portal Captive</label>
+                <label className="text-sm text-gray-400">Portal da empresa</label>
                 <select
                   className="w-full bg-[#0d1117] border border-gray-700 text-white rounded px-3 py-2 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  required
                   value={form.portal_id}
                   onChange={(e) =>
                     setForm({ ...form, portal_id: e.target.value })
                   }
                 >
-                  <option value="">Nenhum</option>
+                  <option value="">Selecione o portal</option>
                   {portais.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.nome} ({p.tipo})
+                      {p.nome}
                     </option>
                   ))}
                 </select>

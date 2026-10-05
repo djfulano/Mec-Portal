@@ -222,7 +222,8 @@ exports.deletarPortal = async (req, res) => {
     if (!portal) return res.status(404).json({ message: "Portal não encontrado" });
     if (portal.tipo !== "custom") return res.status(400).json({ message: "Não é possível remover portais built-in" });
 
-    await db.execute("UPDATE mikrotiks SET portal_id = NULL WHERE portal_id = ? AND empresa_id = ?", [id, req.empresa_id]);
+    const [[bound]] = await db.query("SELECT COUNT(*) total FROM mikrotiks WHERE portal_id=? AND empresa_id=?", [id, req.empresa_id]);
+    if (bound.total) return res.status(409).json({ message: "Transfira ou remova os equipamentos antes de excluir este portal." });
     await db.execute("DELETE FROM portais WHERE id = ? AND empresa_id = ?", [id, req.empresa_id]);
     res.json({ message: "Portal removido" });
   } catch (err) {

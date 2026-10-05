@@ -12,7 +12,7 @@ const tabs = [
   "Autenticação",
   "Acesso e planos",
   "Privacidade",
-  "Unidades e equipamentos",
+  "Equipamentos",
 ];
 export default function PortalDesigner() {
   const { empresaSlug, portalId } = useParams(),
@@ -117,8 +117,8 @@ export default function PortalDesigner() {
   return (
     <AdminLayout>
       <div className="max-w-6xl mx-auto space-y-5">
-        <Link to={base + "/unidades"} className="text-blue-400">
-          ← Unidades e portais
+        <Link to={base + "/portais"} className="text-blue-400">
+          ← Portais da empresa
         </Link>
         <div className="flex flex-wrap justify-between gap-4">
           <div>
@@ -498,70 +498,14 @@ export default function PortalDesigner() {
                   </p>
                 </>
               )}
-              {tab === "Unidades e equipamentos" && (
+              {tab === "Equipamentos" && (
                 <>
-                  <h3>Unidades deste portal</h3>
-                  <div className="flex flex-wrap gap-4">
-                    {data.units
-                      .filter((u) => u.ativo)
-                      .map((u) => (
-                        <label key={u.id} className="flex gap-2">
-                          <input
-                            type="checkbox"
-                            checked={c.unit_ids.includes(u.id)}
-                            onChange={(e) =>
-                              setC({
-                                ...c,
-                                unit_ids: e.target.checked
-                                  ? [...c.unit_ids, u.id]
-                                  : c.unit_ids.filter((id) => id !== u.id),
-                                equipment_ids: e.target.checked
-                                  ? c.equipment_ids
-                                  : c.equipment_ids.filter(
-                                      (id) =>
-                                        data.devices.find((d) => d.id === id)
-                                          ?.unidade_id !== u.id,
-                                    ),
-                              })
-                            }
-                          />
-                          {u.nome}
-                        </label>
-                      ))}
-                  </div>
-                  <h3 className="pt-3">Equipamentos</h3>
-                  {data.devices
-                    .filter((d) => c.unit_ids.includes(d.unidade_id))
-                    .map((d) => (
-                      <label
-                        key={d.id}
-                        className="flex gap-2 p-3 border border-gray-700 rounded-lg"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={c.equipment_ids.includes(d.id)}
-                          onChange={(e) =>
-                            setC({
-                              ...c,
-                              equipment_ids: e.target.checked
-                                ? [...c.equipment_ids, d.id]
-                                : c.equipment_ids.filter((id) => id !== d.id),
-                            })
-                          }
-                        />
-                        {d.nome} ·{" "}
-                        {data.units.find((u) => u.id === d.unidade_id)?.nome}
-                        {d.portal_id && d.portal_id !== Number(portalId) && (
-                          <span className="text-amber-400 text-sm">
-                            substituirá o portal atual
-                          </span>
-                        )}
-                      </label>
-                    ))}
-                  <p className="text-sm text-gray-400">
-                    Um portal ativo por equipamento. A vinculação entra em vigor
-                    ao publicar.
-                  </p>
+                  <p className="text-sm text-gray-400">Cada equipamento pertence a um portal desta empresa. O cadastro define esse vínculo; a publicação atualiza a configuração para todos eles.</p>
+                  <Link to={base + "/mikrotiks"} className="text-blue-400">Cadastrar ou configurar equipamentos →</Link>
+                  {data.devices.filter(d => d.portal_id === Number(portalId)).map(d => (
+                    <div key={d.id} className="p-3 border border-gray-700 rounded-lg">{d.nome} · {d.ip}</div>
+                  ))}
+                  {!data.devices.some(d => d.portal_id === Number(portalId)) && <p className="text-gray-400">Nenhum equipamento vinculado. Cadastre um equipamento e selecione este portal.</p>}
                 </>
               )}
             </section>

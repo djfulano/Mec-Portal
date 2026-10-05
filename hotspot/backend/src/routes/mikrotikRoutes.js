@@ -18,38 +18,23 @@ router.use(async (req, res, next) => {
   try {
     if ((req.method === "POST" && req.path === "/") || req.method === "PUT") {
       const access = require("../services/unitAccess");
-      if (!req.body.unidade_id) {
-        const [u] = await db.query(
-          "SELECT id FROM unidades WHERE empresa_id=? AND ativo=1 ORDER BY id",
-          [req.empresa_id],
-        );
-        if (u.length !== 1)
-          return res
-            .status(400)
-            .json({ message: "Selecione a unidade do equipamento." });
-        req.body.unidade_id = u[0].id;
-      }
-      const unit = await access.unit(req, Number(req.body.unidade_id));
-      if (!unit.ativo)
-        return res.status(400).json({ message: "Unidade inativa." });
-      if (req.body.portal_id) {
-        const [[p]] = await db.query(
-          "SELECT id,managed FROM portais WHERE id=? AND empresa_id=?",
-          [req.body.portal_id, req.empresa_id],
-        );
-        if (!p)
-          return res.status(400).json({ message: "Portal fora da empresa." });
-        if (p.managed) {
-          const [[d]] = await db.query(
-            "SELECT portal_id FROM mikrotiks WHERE id=? AND empresa_id=?",
-            [req.path.slice(1), req.empresa_id],
-          );
-          if (d?.portal_id !== p.id)
-            return res
-              .status(400)
-              .json({ message: "Vincule este portal pelo editor e publique." });
+      if (!req.body.nome?.trim() || !require('net').isIP(req.body.ip || '') || !req.body.usuario || !req.body.senha || !Number.isInteger(Number(req.body.porta)) || Number(req.body.porta)<1 || Number(req.body.porta)>65535) return res.status(400).json({message:'Informe nome, IP válido, usuário, senha e porta do equipamento.'});
+      if (req.method === 'PUT') {
+        const [[existing]] = await db.query('SELECT id,ip FROM mikrotiks WHERE id=? AND empresa_id=?',[req.params.id || req.path.slice(1),req.empresa_id]);
+        if (!existing) return res.status(404).json({message:'Equipamento não encontrado.'});
+        req.previousDevice = existing;
+        if (existing.ip !== req.body.ip) {
+          const [[duplicate]] = await db.query('SELECT id FROM nas WHERE nasname=?',[req.body.ip]);
+          if (duplicate) return res.status(400).json({message:'Já existe equipamento RADIUS com este IP.'});
         }
       }
+      const [[unit]] = await db.query('SELECT id FROM unidades WHERE empresa_id=? AND ativo=1 ORDER BY id LIMIT 1',[req.empresa_id]);
+      if (!unit) return res.status(400).json({message:'Empresa sem configuração de acesso.'});
+      req.body.unidade_id = unit.id;
+      if (!req.body.portal_id) return res.status(400).json({message:'Selecione o portal do equipamento.'});
+      const [[portal]] = await db.query('SELECT id FROM portais WHERE id=? AND empresa_id=?',[req.body.portal_id,req.empresa_id]);
+      if (!portal) return res.status(400).json({message:'Portal fora da empresa.'});
+
     }
     next();
   } catch (e) {
@@ -63,7 +48,7 @@ router.post("/", async (req, res) => {
   const { nome, ip, usuario, senha, porta, end_hotspot, portal_id } = req.body;
 
   if (!nome || !ip || !usuario || !senha || !porta) {
-    console.log("⚠️ Campos obrigatórios faltando:", req.body);
+    console.log("⚠️ Campos obrigatórios faltando no cadastro do equipamento.");
     return res.status(400).json({ message: "Campos obrigatórios faltando." });
   }
 
@@ -161,8 +146,8 @@ router.put("/:id", async (req, res) => {
 
     // Atualiza nas com base no IP atual
     await db.execute(
-      "UPDATE nas SET nasname = ?, shortname = ?, secret = ? WHERE nasname = ?",
-      [ip, nome, senha, ip],
+      "UPDATE nas SET nasname = ?, shortname = ?, secret = ? WHERE nasname = ? AND empresa_id = ?",
+      [ip, nome, senha, req.previousDevice.ip, req.empresa_id],
     );
 
     reloadFreeRADIUS();

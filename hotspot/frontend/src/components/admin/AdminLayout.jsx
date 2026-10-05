@@ -144,7 +144,7 @@ export default function AdminLayout({ children }) {
       : []),
     {
       key: "mikrotik_group",
-      title: "Mikrotik",
+      title: "Equipamentos",
       icon: (
         <svg
           className="w-5 h-5"
@@ -507,10 +507,10 @@ export default function AdminLayout({ children }) {
             )}
 
             <Link
-              to={`${basePath}/unidades`}
+              to={`${basePath}/portais`}
               className="flex items-center gap-3 px-4 py-3 rounded-lg text-blue-400 bg-blue-900/20 mb-3"
             >
-              <span className="text-sm font-semibold">Unidades e portais</span>
+              <span className="text-sm font-semibold">Portais e equipamentos</span>
             </Link>
             {(allUnits ? filteredMenuItems : []).map((item) => {
               if (item.children) {

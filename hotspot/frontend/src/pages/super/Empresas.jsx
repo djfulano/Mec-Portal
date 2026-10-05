@@ -94,7 +94,7 @@ export default function Empresas() {
                   <p className="font-medium text-white">{e.nome}</p>
                   <p className="text-sm text-gray-500">{e.email} | slug: {e.slug} {e.cnpj && `| CNPJ: ${e.cnpj}`}</p>
                   <p className="text-xs text-gray-600 mt-1">
-                    {e.total_mikrotiks || 0} mikrotiks | {e.total_planos || 0} planos | {e.total_admins || 0} admins
+                    {e.total_mikrotiks || 0} equipamentos | {e.total_portais || 0} portais | {e.total_admins || 0} admins
                   </p>
                 </div>
                 <div className="flex gap-2">
