@@ -107,8 +107,11 @@ async function migrate() {
       await conn.execute(`UPDATE portais SET empresa_id = ?`, [empresaId]);
     }
 
+    const tableExists = async (name) => { const [rows] = await conn.execute("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?", [name]); return rows.length > 0; };
+
     // 9. Adicionar empresa_id em lgpd_logins
     console.log('9. Alterando tabela lgpd_logins...');
+    if (await tableExists('lgpd_logins')) {
     const [lgpdCols] = await conn.execute(`SHOW COLUMNS FROM lgpd_logins LIKE 'empresa_id'`);
     if (lgpdCols.length === 0) {
       await conn.execute(`ALTER TABLE lgpd_logins ADD COLUMN empresa_id INT DEFAULT NULL AFTER id`);
@@ -116,13 +119,18 @@ async function migrate() {
       await conn.execute(`UPDATE lgpd_logins SET empresa_id = ?`, [empresaId]);
     }
 
+    }
+
     // 10. Adicionar empresa_id em radius_users
     console.log('10. Alterando tabela radius_users...');
+    if (await tableExists('radius_users')) {
     const [ruCols] = await conn.execute(`SHOW COLUMNS FROM radius_users LIKE 'empresa_id'`);
     if (ruCols.length === 0) {
       await conn.execute(`ALTER TABLE radius_users ADD COLUMN empresa_id INT DEFAULT NULL AFTER id`);
       await conn.execute(`ALTER TABLE radius_users ADD KEY idx_radius_users_empresa (empresa_id)`);
       await conn.execute(`UPDATE radius_users SET empresa_id = ?`, [empresaId]);
+    }
+
     }
 
     // 11. Adicionar empresa_id em nas
@@ -136,7 +144,7 @@ async function migrate() {
 
     // 12. Migrar config_mercadopago para empresa_configs
     console.log('12. Migrando config_mercadopago...');
-    const [mpConfigs] = await conn.execute('SELECT * FROM config_mercadopago ORDER BY id DESC LIMIT 1');
+    const [mpConfigs] = await tableExists('config_mercadopago') ? await conn.execute('SELECT * FROM config_mercadopago ORDER BY id DESC LIMIT 1') : [[]];
     if (mpConfigs.length > 0) {
       const mp = mpConfigs[0];
       const configJson = JSON.stringify({
@@ -155,7 +163,7 @@ async function migrate() {
 
     // 13. Migrar efi_config para empresa_configs
     console.log('13. Migrando efi_config...');
-    const [efiConfigs] = await conn.execute('SELECT * FROM efi_config ORDER BY id DESC LIMIT 1');
+    const [efiConfigs] = await tableExists('efi_config') ? await conn.execute('SELECT * FROM efi_config ORDER BY id DESC LIMIT 1') : [[]];
     if (efiConfigs.length > 0) {
       const efi = efiConfigs[0];
       const configJson = JSON.stringify({
