@@ -19,6 +19,10 @@ error_exit() {
   exit 1
 }
 
+if [ -f /var/www/hotspot/backend/.env ]; then
+  error_exit "Sistema ja instalado. Use update.sh; nao execute uma reinstalacao." "Instalacao"
+fi
+
 # Funcao para verificar se comando anterior teve sucesso
 check_step() {
   if [ $? -ne 0 ]; then

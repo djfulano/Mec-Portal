@@ -24,6 +24,7 @@ O email inicial e `admin@empresa.com`. Cada instalacao gera uma senha aleatoria,
 ## Atualizacao
 
 ```bash
+sudo git -C /opt/hotspot-source pull --ff-only
 sudo bash /opt/hotspot-source/update.sh
 ```
 
@@ -41,3 +42,7 @@ Nao execute `install.sh` para atualizar: ele recusa servidores com `.env` existe
 4. Execute `update.sh` no servidor de producao quando desejar instalar a versao aprovada.
 
 A publicacao de codigo no GitHub nao atualiza producao automaticamente. A tela antiga de atualizacoes via servidor externo nao e o mecanismo de atualizacao deste repositorio; use o script acima.
+
+## Validacao da primeira versao
+
+Verificado no Debian 13: scripts Bash, build do frontend, atualizacao com backup, rollback do codigo em falha, acesso ao portal/API/Evolution e execucao unica de 15 migrations. O banco inicial e a senha aleatoria foram validados em uma base temporaria. A instalacao completa de um segundo servidor ainda deve ser acompanhada.
