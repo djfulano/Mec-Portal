@@ -6,6 +6,7 @@ const { getPermissoesConsolidadas, MODULOS } = require('./grupoPermissaoControll
 exports.login = async (req, res) => {
   const { email, password, senha } = req.body
   const pass = password || senha
+  if (typeof email !== 'string' || !email.trim() || typeof pass !== 'string' || !pass) return res.status(400).json({ error: 'Informe email e senha.' })
   const user = await Admin.findByEmail(email)
 
   if (!user) return res.status(401).json({ error: 'Usuário não encontrado' })

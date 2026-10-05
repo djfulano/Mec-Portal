@@ -29,10 +29,18 @@ const findById = async (id) => {
 };
 
 const create = async (email, passwordHash, empresa_id, role = 'operator', nome = null) => {
-  await db.execute(
+  const conn = await db.getConnection();
+  try {
+  await conn.beginTransaction();
+  const [result] = await conn.execute(
     'INSERT INTO admins (empresa_id, email, password, nome, role) VALUES (?, ?, ?, ?, ?)',
     [empresa_id, email, passwordHash, nome, role]
   );
+  await conn.execute('INSERT INTO admin_empresas (admin_id, empresa_id, role) VALUES (?, ?, ?)', [result.insertId, empresa_id, role === 'super_admin' ? 'owner' : role]);
+  await conn.commit();
+  return result.insertId;
+  } catch (err) { await conn.rollback(); throw err; }
+  finally { conn.release(); }
 };
 
 const update = async (id, email, nome = null) => {

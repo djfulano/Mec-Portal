@@ -42,14 +42,14 @@ export default function Usuarios() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Erro ao salvar usuário");
+      if (!res.ok) { const data = await res.json(); throw new Error(data.message || data.error || 'Erro ao salvar usuário'); }
 
       setShowModal(false);
       setEditando(null);
       setForm({ email: "", senha: "" });
       carregarUsuarios();
     } catch (err) {
-      alert("Erro ao salvar usuário");
+      alert(err.message || "Erro ao salvar usuário");
     }
   };
 

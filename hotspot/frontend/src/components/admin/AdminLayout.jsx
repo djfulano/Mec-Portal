@@ -33,7 +33,10 @@ export default function AdminLayout({ children }) {
         }
       } catch (e) { /* silencioso */ }
     };
+    setEmpresaLogo(null);
     if (slug) fetchLogo();
+    window.addEventListener('empresa-logo-updated', fetchLogo);
+    return () => window.removeEventListener('empresa-logo-updated', fetchLogo);
   }, [slug]);
 
   // Verificar status do WhatsApp para exibir aviso se desconectado
@@ -235,7 +238,7 @@ export default function AdminLayout({ children }) {
         {/* Logo Header */}
         <div className="p-6 border-b border-gray-800">
           <div className="flex items-center justify-between">
-            <img src={empresaLogo || '/logo-forum.jpg'} alt="Logo" className="h-12 max-w-[160px] object-contain" />
+            {empresaLogo ? <img src={empresaLogo} alt="Logo da empresa" className="h-12 max-w-[160px] object-contain" onError={() => setEmpresaLogo(null)} /> : <span className="font-semibold text-white">{user?.empresa_nome || 'SpotControl Pro'}</span>}
             <button
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden p-2 rounded-lg hover:bg-gray-800 text-gray-400"
@@ -405,7 +408,7 @@ export default function AdminLayout({ children }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/>
               </svg>
             </button>
-            <img src="/logo-forum.jpg" alt="Logo" className="h-8" />
+            {empresaLogo ? <img src={empresaLogo} alt="Logo da empresa" className="h-8 max-w-[160px] object-contain" /> : <span className="font-semibold text-white">{user?.empresa_nome || 'SpotControl Pro'}</span>}
             <div className="w-10" />
           </div>
         </header>

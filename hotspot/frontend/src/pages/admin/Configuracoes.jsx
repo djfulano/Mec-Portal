@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import ConfiguracaoMercadoPago from "../../components/admin/ConfiguracaoMercadoPago";
+import LogoEmpresa from "../../components/admin/LogoEmpresa";
 
 const acoes = [
   { chave: "radius", titulo: "Limpar Usuários RADIUS", endpoint: "/api/limpeza/radius" },
@@ -9,7 +10,7 @@ const acoes = [
 ];
 
 export default function Configuracoes() {
-  const [aba, setAba] = useState("limpeza");
+  const [aba, setAba] = useState("logo");
   const [modal, setModal] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -49,6 +50,7 @@ export default function Configuracoes() {
       <h1 className="text-2xl font-semibold mb-6">Configurações</h1>
 
       <div className="flex border-b mb-4">
+        <button onClick={() => setAba('logo')} className={`px-4 py-2 border-b-2 ${aba === 'logo' ? 'border-blue-500 font-semibold' : 'border-transparent'}`}>Logo da empresa</button>
         <button
           onClick={() => setAba("limpeza")}
           className={`px-4 py-2 border-b-2 ${aba === "limpeza" ? "border-blue-500 font-semibold" : "border-transparent"}`}
@@ -63,6 +65,7 @@ export default function Configuracoes() {
         </button>
       </div>
 
+      {aba === 'logo' && <LogoEmpresa />}
       {aba === "limpeza" && (
         <div className="space-y-4">
           {acoes.map((acao) => (

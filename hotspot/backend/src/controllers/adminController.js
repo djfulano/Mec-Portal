@@ -7,7 +7,8 @@ const listarAdmins = async (req, res) => {
 };
 
 const criarAdmin = async (req, res) => {
-  const { email, senha, nome, role } = req.body;
+  const { senha, nome, role } = req.body;
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
 
   if (!email || !senha) {
     return res.status(400).json({ message: "Email e senha são obrigatórios" });
@@ -15,6 +16,8 @@ const criarAdmin = async (req, res) => {
 
   // Apenas owner e super_admin podem criar admins
   const allowedRole = role || 'operator';
+  if (!['operator', 'manager', 'owner', 'super_admin'].includes(allowedRole)) return res.status(400).json({ message: 'Perfil inválido.' });
+  if (!req.empresa_id) return res.status(400).json({ message: 'Selecione uma empresa antes de criar o administrador.' });
   if (allowedRole === 'super_admin' && req.user.role !== 'super_admin') {
     return res.status(403).json({ message: "Apenas super admin pode criar super admins" });
   }
@@ -24,6 +27,7 @@ const criarAdmin = async (req, res) => {
     await Admin.create(email, hash, req.empresa_id, allowedRole, nome || null);
     res.status(201).json({ message: "Administrador criado com sucesso" });
   } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'Este email já está cadastrado.' });
     console.error("Erro ao criar admin:", err);
     res.status(500).json({ message: "Erro interno ao criar administrador" });
   }

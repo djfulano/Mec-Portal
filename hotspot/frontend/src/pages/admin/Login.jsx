@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 
 export default function Login() {
@@ -8,6 +8,16 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState(null)
+  const [empresa, setEmpresa] = useState(null)
+  const [params] = useSearchParams()
+  const empresaSlug = params.get('empresa') || 'default'
+  useEffect(() => {
+    const controller = new AbortController()
+    setEmpresa(null)
+    fetch(`/api/empresas/public/${encodeURIComponent(empresaSlug)}`, { signal: controller.signal })
+      .then(res => res.ok ? res.json() : null).then(setEmpresa).catch(() => {})
+    return () => controller.abort()
+  }, [empresaSlug])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -26,7 +36,7 @@ export default function Login() {
         const slug = data.user?.empresa_slug || 'default'
         navigate(`/admin/${slug}`)
       } else {
-        setErro(data.message || 'Erro ao fazer login')
+        setErro(data.message || data.error || 'Erro ao fazer login')
       }
     } catch (err) {
       setErro('Erro de conexão com o servidor')
@@ -37,6 +47,7 @@ export default function Login() {
     <div className="flex items-center justify-center h-screen bg-[#0f111a]">
       <form onSubmit={handleLogin} className="bg-[#1a1d27] border border-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm">
         <div className="mb-6 text-center">
+          {empresa?.logo_url && <img src={empresa.logo_url} alt={`Logo de ${empresa.nome}`} className="max-h-28 max-w-full object-contain mx-auto mb-4" onError={() => setEmpresa(prev => ({ ...prev, logo_url: null }))} />}
           <h2 className="text-2xl font-bold text-white">SpotControl Pro</h2>
 
         </div>
