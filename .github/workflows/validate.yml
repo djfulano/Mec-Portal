@@ -1,0 +1,21 @@
+name: Validar projeto
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            hotspot/frontend/package-lock.json
+            hotspot/backend/package-lock.json
+      - run: bash -n install.sh install-from-git.sh update.sh habilitar-acesso-ip.sh
+      - run: find hotspot/backend -name '*.js' -not -path '*/node_modules/*' -print0 | xargs -0 -n1 node --check
+      - run: npm ci && npm run build
+        working-directory: hotspot/frontend

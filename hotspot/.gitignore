@@ -1,0 +1,19 @@
+# Ambiente
+backend/.env
+backend/certificados/*.pem
+backend/certificados/*.p12
+backend/tokens/
+
+# Node
+node_modules/
+frontend/dist/
+
+# WireGuard keys
+infra/wireguard/.wg-easy/
+
+# Credenciais
+hotspot-credenciais.txt
+
+# OS
+.DS_Store
+Thumbs.db
