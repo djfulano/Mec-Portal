@@ -1,0 +1,23 @@
+[
+  {
+    "version": "1.1.0",
+    "date": "2026-10-05",
+    "title": "Histórico de versões",
+    "changes": [
+      "Versão atual exibida no rodapé do menu lateral, acima do e-mail e do botão Sair.",
+      "Histórico de alterações disponível ao clicar na versão."
+    ]
+  },
+  {
+    "version": "1.0.0",
+    "date": "2026-10-05",
+    "title": "Empresas, unidades e portais",
+    "changes": [
+      "Organização por empresa, unidades e equipamentos, com permissões por unidade.",
+      "Editor central de portais com rascunhos, publicação, prévia e clonagem.",
+      "Cadastro compartilhado ou separado entre unidades e campos personalizados.",
+      "Autenticação por formulário, código WhatsApp e usuário/senha; planos gratuitos e PIX.",
+      "Controles de privacidade, auditoria, retenção e preservação do histórico de acessos."
+    ]
+  }
+]

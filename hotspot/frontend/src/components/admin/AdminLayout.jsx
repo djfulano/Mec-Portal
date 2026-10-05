@@ -1,4 +1,5 @@
 import Copyright from "../Copyright";
+import VersionHistory from "./VersionHistory";
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
@@ -609,7 +610,9 @@ export default function AdminLayout({ children }) {
           </div>
         </nav>
 
-        <div className="mt-auto shrink-0 border-t border-gray-800 px-4 py-4 flex items-center gap-2">
+        <div className="mt-auto shrink-0 border-t border-gray-800 px-4 py-4">
+          <VersionHistory />
+          <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0">
             {user?.nome && (
               <p
@@ -642,6 +645,7 @@ export default function AdminLayout({ children }) {
             </svg>
             <span className="text-sm">Sair</span>
           </button>
+          </div>
         </div>
       </aside>
 
