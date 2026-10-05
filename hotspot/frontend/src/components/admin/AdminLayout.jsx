@@ -238,11 +238,11 @@ export default function AdminLayout({ children }) {
       >
         {/* Logo Header */}
         <div className="p-6 border-b border-gray-800">
-          <div className="flex items-center justify-between">
-            {empresaLogo ? <img src={empresaLogo} alt="Logo da empresa" className="h-12 max-w-[160px] object-contain" onError={() => setEmpresaLogo(null)} /> : <span className="font-semibold text-white">{user?.empresa_nome || 'Mec Portal'}</span>}
+          <div className="relative flex items-center justify-center">
+            {empresaLogo ? <img src={empresaLogo} alt="Logo da empresa" className="w-full h-28 object-contain" onError={() => setEmpresaLogo(null)} /> : <span className="font-semibold text-white">{user?.empresa_nome || 'Mec Portal'}</span>}
             <button
               onClick={() => setSidebarOpen(false)}
-              className="lg:hidden p-2 rounded-lg hover:bg-gray-800 text-gray-400"
+              className="lg:hidden absolute -top-4 -right-4 p-2 rounded-lg bg-[#1a1d27] hover:bg-gray-800 text-gray-400"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
@@ -409,7 +409,7 @@ export default function AdminLayout({ children }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/>
               </svg>
             </button>
-            {empresaLogo ? <img src={empresaLogo} alt="Logo da empresa" className="h-8 max-w-[160px] object-contain" /> : <span className="font-semibold text-white">{user?.empresa_nome || 'Mec Portal'}</span>}
+            {empresaLogo ? <img src={empresaLogo} alt="Logo da empresa" className="h-14 max-w-[60%] object-contain" /> : <span className="font-semibold text-white">{user?.empresa_nome || 'Mec Portal'}</span>}
             <div className="w-10" />
           </div>
         </header>
