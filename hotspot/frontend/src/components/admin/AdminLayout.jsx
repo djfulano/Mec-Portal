@@ -249,11 +249,6 @@ export default function AdminLayout({ children }) {
               </svg>
             </button>
           </div>
-          {/* Nome do usuário */}
-          <div className="mt-2">
-            <p className="text-sm text-white font-medium truncate">{user?.nome || user?.email}</p>
-            {user?.nome && <p className="text-[11px] text-gray-500 truncate">{user?.email}</p>}
-          </div>
           {/* Empresa switcher */}
           <div className="mt-3">
             {empresas.length > 1 ? (
@@ -381,18 +376,24 @@ export default function AdminLayout({ children }) {
               );
             })}
 
-            {/* Logout Button */}
+          </div>
+        </nav>
+
+        <div className="mt-auto shrink-0 border-t border-gray-800 px-4 py-4 flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            {user?.nome && <p className="text-sm text-white font-medium truncate" title={user.nome}>{user.nome}</p>}
+            <p className="text-xs text-gray-400 break-all" title={user?.email}>{user?.email}</p>
+          </div>
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-400 hover:bg-red-900/20 hover:text-red-400 transition-all duration-200 mt-2 cursor-pointer"
+              className="shrink-0 flex items-center gap-1.5 px-2 py-2 rounded-lg font-medium text-gray-400 hover:bg-red-900/20 hover:text-red-400 transition-all duration-200 cursor-pointer"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
               </svg>
               <span className="text-sm">Sair</span>
             </button>
-          </div>
-        </nav>
+        </div>
 
       </aside>
 
