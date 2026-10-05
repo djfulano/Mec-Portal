@@ -1,6 +1,10 @@
 import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import Login from "./pages/admin/Login";
+import Unidades from "./pages/admin/Unidades";
+import PortalDesigner from "./pages/admin/PortalDesigner";
+import CaptivePortal from "./pages/public/CaptivePortal";
+import MeusDados from "./pages/public/MeusDados";
 import Dashboard from "./pages/admin/Dashboard";
 import Mikrotiks from "./pages/admin/Mikrotiks";
 import Planos from "./pages/admin/Planos";
@@ -44,7 +48,8 @@ const RotaPrivada = ({ children }) => {
   const { empresaSlug } = useParams();
   if (loading) return null;
   if (!user) return <Navigate to="/" />;
-  if (user.role !== 'super_admin' && empresaSlug !== user.empresa_slug) return <Navigate to={`/admin/${user.empresa_slug}`} replace />;
+  if (user.role !== "super_admin" && empresaSlug !== user.empresa_slug)
+    return <Navigate to={`/admin/${user.empresa_slug}`} replace />;
   return children;
 };
 
@@ -52,7 +57,8 @@ const RotaSuper = ({ children }) => {
   const { user, loading, isSuperAdmin } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/" />;
-  if (!isSuperAdmin) return <Navigate to={`/admin/${user.empresa_slug}`} replace />;
+  if (!isSuperAdmin)
+    return <Navigate to={`/admin/${user.empresa_slug}`} replace />;
   return children;
 };
 
@@ -61,7 +67,14 @@ const AdminRedirect = () => {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/" />;
-  return <Navigate to={user.role === 'super_admin' ? '/super' : `/admin/${user.empresa_slug}`} replace />;
+  return (
+    <Navigate
+      to={
+        user.role === "super_admin" ? "/super" : `/admin/${user.empresa_slug}`
+      }
+      replace
+    />
+  );
 };
 
 function App() {
@@ -69,6 +82,8 @@ function App() {
     <Routes>
       {/* Público */}
       <Route path="/" element={<Login />} />
+      <Route path="/wifi/:equipmentId" element={<CaptivePortal />} />
+      <Route path="/meus-dados" element={<MeusDados />} />
       <Route path="/cadastro-cliente" element={<CadastroCliente />} />
       <Route path="/planos-cliente" element={<PlanosCliente />} />
       <Route path="/pagamento/:id" element={<Pagamento />} />
@@ -84,34 +99,232 @@ function App() {
       <Route path="/admin" element={<AdminRedirect />} />
 
       {/* Admin (protegidas com empresa slug) */}
-      <Route path="/admin/:empresaSlug" element={<RotaPrivada><Dashboard /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/empresas" element={<RotaPrivada><EmpresasAdmin /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/mikrotiks" element={<RotaPrivada><Mikrotiks /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/vpn" element={<RotaPrivada><Wireguard /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/portais" element={<RotaPrivada><Portais /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/portais/:portalId/editor" element={<RotaPrivada><PortalEditor /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/planos" element={<RotaPrivada><Planos /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/configuracoes" element={<RotaPrivada><Configuracoes /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/pagamentos" element={<RotaPrivada><Pagamentos /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/radius" element={<RotaPrivada><UsuariosRadius /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/lgpd" element={<RotaPrivada><LgpdCadastros /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/sessoes" element={<RotaPrivada><Sessoes /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/sessoeslog" element={<RotaPrivada><SessoesLog /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/leads" element={<RotaPrivada><Leads /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/compliance" element={<RotaPrivada><Compliance /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/usuarios" element={<RotaPrivada><Usuarios /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/grupos-permissao" element={<RotaPrivada><GruposPermissao /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/whatsapp" element={<RotaPrivada><WhatsApp /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/campanhas" element={<RotaPrivada><Campanhas /></RotaPrivada>} />
-      <Route path="/admin/:empresaSlug/campanhas/:id" element={<RotaPrivada><CampanhaEditor /></RotaPrivada>} />
+      <Route
+        path="/admin/:empresaSlug"
+        element={
+          <RotaPrivada>
+            <Unidades />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/unidades"
+        element={
+          <RotaPrivada>
+            <Unidades />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/portais/:portalId/configurar"
+        element={
+          <RotaPrivada>
+            <PortalDesigner />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/empresas"
+        element={
+          <RotaPrivada>
+            <EmpresasAdmin />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/mikrotiks"
+        element={
+          <RotaPrivada>
+            <Mikrotiks />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/vpn"
+        element={
+          <RotaPrivada>
+            <Wireguard />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/portais"
+        element={
+          <RotaPrivada>
+            <Unidades initialTab="Portais" />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/portais/:portalId/editor"
+        element={
+          <RotaPrivada>
+            <PortalEditor />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/planos"
+        element={
+          <RotaPrivada>
+            <Planos />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/configuracoes"
+        element={
+          <RotaPrivada>
+            <Configuracoes />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/pagamentos"
+        element={
+          <RotaPrivada>
+            <Pagamentos />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/radius"
+        element={
+          <RotaPrivada>
+            <UsuariosRadius />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/lgpd"
+        element={
+          <RotaPrivada>
+            <LgpdCadastros />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/sessoes"
+        element={
+          <RotaPrivada>
+            <Sessoes />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/sessoeslog"
+        element={
+          <RotaPrivada>
+            <SessoesLog />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/leads"
+        element={
+          <RotaPrivada>
+            <Leads />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/compliance"
+        element={
+          <RotaPrivada>
+            <Compliance />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/usuarios"
+        element={
+          <RotaPrivada>
+            <Usuarios />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/grupos-permissao"
+        element={
+          <RotaPrivada>
+            <GruposPermissao />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/whatsapp"
+        element={
+          <RotaPrivada>
+            <WhatsApp />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/campanhas"
+        element={
+          <RotaPrivada>
+            <Campanhas />
+          </RotaPrivada>
+        }
+      />
+      <Route
+        path="/admin/:empresaSlug/campanhas/:id"
+        element={
+          <RotaPrivada>
+            <CampanhaEditor />
+          </RotaPrivada>
+        }
+      />
 
       {/* Super Admin */}
-      <Route path="/super/usuarios" element={<RotaSuper><Usuarios global /></RotaSuper>} />
-      <Route path="/super" element={<RotaSuper><SuperDashboard /></RotaSuper>} />
-      <Route path="/super/empresas" element={<RotaSuper><Empresas /></RotaSuper>} />
-      <Route path="/super/atualizar" element={<RotaSuper><AtualizarSistema /></RotaSuper>} />
-      <Route path="/super/backups" element={<RotaSuper><Backups /></RotaSuper>} />
-      <Route path="/super/publicar-atualizacao" element={<RotaSuper><PublicarAtualizacao /></RotaSuper>} />
+      <Route
+        path="/super/usuarios"
+        element={
+          <RotaSuper>
+            <Usuarios global />
+          </RotaSuper>
+        }
+      />
+      <Route
+        path="/super"
+        element={
+          <RotaSuper>
+            <SuperDashboard />
+          </RotaSuper>
+        }
+      />
+      <Route
+        path="/super/empresas"
+        element={
+          <RotaSuper>
+            <Empresas />
+          </RotaSuper>
+        }
+      />
+      <Route
+        path="/super/atualizar"
+        element={
+          <RotaSuper>
+            <AtualizarSistema />
+          </RotaSuper>
+        }
+      />
+      <Route
+        path="/super/backups"
+        element={
+          <RotaSuper>
+            <Backups />
+          </RotaSuper>
+        }
+      />
+      <Route
+        path="/super/publicar-atualizacao"
+        element={
+          <RotaSuper>
+            <PublicarAtualizacao />
+          </RotaSuper>
+        }
+      />
     </Routes>
   );
 }

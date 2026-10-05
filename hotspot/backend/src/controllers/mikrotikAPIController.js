@@ -7,8 +7,12 @@ async function obterInformacoes(req, res) {
   const { id } = req.params;
 
   try {
-    const [[mikrotik]] = await db.execute("SELECT * FROM mikrotiks WHERE id = ? AND empresa_id = ?", [id, req.empresa_id]);
-    if (!mikrotik) return res.status(404).json({ message: "Mikrotik não encontrado" });
+    const [[mikrotik]] = await db.execute(
+      "SELECT * FROM mikrotiks WHERE id = ? AND empresa_id = ?",
+      [id, req.empresa_id],
+    );
+    if (!mikrotik)
+      return res.status(404).json({ message: "Mikrotik não encontrado" });
 
     const conn = new RouterOSAPI({
       host: mikrotik.ip,
@@ -45,13 +49,24 @@ async function obterInformacoes(req, res) {
  * @param {number} [params.empresa_id] - ID da empresa (obrigatório para multi-tenant)
  * @param {number} [params.shared_users] - Limite de sessões simultâneas
  */
-async function liberarUsuario({ mac, ip, plano, empresa_id, cpf, telefone, cliente_id, portal_id, contexto_tipo, referencia_id }) {
+async function liberarUsuario({
+  mac,
+  ip,
+  plano,
+  empresa_id,
+  cpf,
+  telefone,
+  cliente_id,
+  portal_id,
+  contexto_tipo,
+  referencia_id,
+}) {
   try {
     // Username/senha: CPF (se tiver) ou MAC. Nao bloqueia por falta de CPF
     // (portais de Leads e Leads sem internet podem nao ter CPF).
     const cpfNumeros = cpf ? String(cpf).replace(/\D/g, "") : null;
     const username = cpfNumeros || mac;
-    const senha = cpfNumeros || mac;
+    const senha = require("crypto").randomBytes(24).toString("hex");
 
     // Consulta plano FILTRANDO POR EMPRESA
     let planoQuery = "SELECT * FROM planos WHERE nome = ?";
@@ -64,7 +79,10 @@ async function liberarUsuario({ mac, ip, plano, empresa_id, cpf, telefone, clien
 
     const [planos] = await db.query(planoQuery, planoParams);
     const p = planos[0];
-    if (!p) throw new Error(`Plano '${plano}' não encontrado${empresa_id ? ` para empresa ${empresa_id}` : ''}`);
+    if (!p)
+      throw new Error(
+        `Plano '${plano}' não encontrado${empresa_id ? ` para empresa ${empresa_id}` : ""}`,
+      );
 
     const rateLimit = `${p.velocidade_up}M/${p.velocidade_down}M`;
     const tempoSegundos = p.duracao_minutos * 60;
@@ -76,21 +94,18 @@ async function liberarUsuario({ mac, ip, plano, empresa_id, cpf, telefone, clien
     await db.query("DELETE FROM radusergroup WHERE username = ?", [username]);
 
     // Limpa sessões atuais do dia (reinicia contador do dailycounter)
-    await db.query(
-      `DELETE FROM radacct WHERE username = ? AND acctstarttime >= CURDATE()`,
-      [username]
-    );
+    // Histórico RADIUS preservado: reconexões não apagam sessões.
 
     // Insere autenticação com limite diário e sessões simultâneas
     const checkValues = [
-      [username, 'Cleartext-Password', ':=', senha],
-      [username, 'Max-Daily-Session', ':=', String(tempoSegundos)],
-      [username, 'Simultaneous-Use', ':=', String(sharedUsers)],
+      [username, "Cleartext-Password", ":=", senha],
+      [username, "Max-Daily-Session", ":=", String(tempoSegundos)],
+      [username, "Simultaneous-Use", ":=", String(sharedUsers)],
     ];
     await db.query(
       `INSERT INTO radcheck (username, attribute, op, value) VALUES
        (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)`,
-      checkValues.flat()
+      checkValues.flat(),
     );
 
     // Insere perfil de banda e timeout
@@ -98,30 +113,40 @@ async function liberarUsuario({ mac, ip, plano, empresa_id, cpf, telefone, clien
       `INSERT INTO radreply (username, attribute, op, value) VALUES
         (?, 'Mikrotik-Rate-Limit', ':=', ?),
         (?, 'Session-Timeout', ':=', ?)`,
-      [username, rateLimit, username, String(tempoSegundos)]
+      [username, rateLimit, username, String(tempoSegundos)],
     );
 
     // Associa a grupo/plano
     await db.query(
       "INSERT INTO radusergroup (username, groupname) VALUES (?, ?)",
-      [username, String(p.id)]
+      [username, String(p.id)],
     );
 
     // Atualiza ou insere vínculo com EMPRESA_ID
     const empresaIdFinal = empresa_id || p.empresa_id;
-    await db.query(`
+    await db.query(
+      `
       INSERT INTO radius_users (empresa_id, username, plano_id, nas_id)
       VALUES (?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE plano_id = VALUES(plano_id), nas_id = VALUES(nas_id), empresa_id = VALUES(empresa_id)
-    `, [empresaIdFinal, username, p.id, p.mikrotik_id]);
+    `,
+      [empresaIdFinal, username, p.id, p.mikrotik_id],
+    );
 
     // Monta URL de auto-login do hotspot
     const [mkInfo] = await db.query(
       "SELECT end_hotspot, ip FROM mikrotiks WHERE id = ? LIMIT 1",
-      [p.mikrotik_id]
+      [p.mikrotik_id],
+    );
+    await require("../services/bindLegacyNas")(
+      username,
+      p.mikrotik_id,
+      empresaIdFinal,
     );
     const gateway = mkInfo[0]?.end_hotspot || mkInfo[0]?.ip || null;
-    const loginUrl = gateway ? `http://${gateway}/login?username=${username}&password=${username}` : "";
+    const loginUrl = gateway
+      ? `http://${gateway}/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(senha)}`
+      : "";
 
     // Dispara notificacao WhatsApp via service centralizado.
     // NUNCA bloqueia a liberacao: erros sao logados em whatsapp_logs.
@@ -144,9 +169,13 @@ async function liberarUsuario({ mac, ip, plano, empresa_id, cpf, telefone, clien
         login_url: loginUrl,
         cpf: cpfNumeros || "",
       },
-    }).catch(err => console.warn("[liberarUsuario] notificarLiberacao falhou:", err.message));
+    }).catch((err) =>
+      console.warn("[liberarUsuario] notificarLiberacao falhou:", err.message),
+    );
 
-    console.log(`Usuario ${username} liberado com plano ${plano} (empresa: ${empresaIdFinal})`);
+    console.log(
+      `Usuario ${username} liberado com plano ${plano} (empresa: ${empresaIdFinal})`,
+    );
   } catch (error) {
     console.error("Erro ao liberar usuario:", error.message);
     throw error;
@@ -157,7 +186,7 @@ async function liberarUsuario({ mac, ip, plano, empresa_id, cpf, telefone, clien
  * Remove usuário do MikroTik E limpa RADIUS.
  */
 async function removerUsuarioPorMac(mac, limparRadius = true) {
-  if (!mac || typeof mac !== 'string') {
+  if (!mac || typeof mac !== "string") {
     console.error("MAC address invalido ou nao fornecido");
     return { success: false, message: "MAC address invalido" };
   }
@@ -167,17 +196,20 @@ async function removerUsuarioPorMac(mac, limparRadius = true) {
     user: { removed: false },
     active: { removed: false },
     host: { removed: false },
-    radius: { removed: false }
+    radius: { removed: false },
   };
 
   try {
     // Busca a MikroTik associada ao MAC
-    const [[mikrotik]] = await db.query(`
+    const [[mikrotik]] = await db.query(
+      `
       SELECT m.* FROM mikrotiks m
       JOIN pagamentos p ON p.mac = ?
       JOIN planos pl ON pl.id = p.plano_id AND pl.mikrotik_id = m.id
       LIMIT 1
-    `, [mac]);
+    `,
+      [mac],
+    );
 
     if (!mikrotik) {
       console.error("Mikrotik nao encontrada para o MAC:", mac);
@@ -186,7 +218,11 @@ async function removerUsuarioPorMac(mac, limparRadius = true) {
         await limparUsuarioRadius(mac);
         resultados.radius = { removed: true };
       }
-      return { success: true, message: "RADIUS limpo (MikroTik nao encontrada)", results: resultados };
+      return {
+        success: true,
+        message: "RADIUS limpo (MikroTik nao encontrada)",
+        results: resultados,
+      };
     }
 
     conn = new RouterOSAPI({
@@ -210,20 +246,26 @@ async function removerUsuarioPorMac(mac, limparRadius = true) {
       return {
         success: true,
         message: "RADIUS limpo (MikroTik inacessivel)",
-        results: resultados
+        results: resultados,
       };
     }
 
     const processarRemocao = async (caminho) => {
       try {
-        const [user] = await conn.write(`${caminho}/print`, [`?mac-address=${mac}`]);
-        if (!user || user === '!done' || user === '!empty' || !user['.id']) {
+        const [user] = await conn.write(`${caminho}/print`, [
+          `?mac-address=${mac}`,
+        ]);
+        if (!user || user === "!done" || user === "!empty" || !user[".id"]) {
           return { removed: false, message: "Nao encontrado" };
         }
-        await conn.write(`${caminho}/remove`, [`=.id=${user['.id']}`]);
+        await conn.write(`${caminho}/remove`, [`=.id=${user[".id"]}`]);
         return { removed: true };
       } catch (err) {
-        if (err.message.includes('UNKNOWNREPLY') || err.message.includes('!empty') || err.message.includes('no such item')) {
+        if (
+          err.message.includes("UNKNOWNREPLY") ||
+          err.message.includes("!empty") ||
+          err.message.includes("no such item")
+        ) {
           return { removed: false, message: "Ja removido" };
         }
         return { removed: false, error: err.message };
@@ -240,11 +282,11 @@ async function removerUsuarioPorMac(mac, limparRadius = true) {
       resultados.radius = { removed: true };
     }
 
-    const sucessoGlobal = Object.values(resultados).some(r => r.removed);
+    const sucessoGlobal = Object.values(resultados).some((r) => r.removed);
     return {
       success: sucessoGlobal,
       message: sucessoGlobal ? "Operacao concluida" : "Falha na remocao",
-      results: resultados
+      results: resultados,
     };
   } catch (err) {
     console.error("Erro geral:", err.message);
@@ -252,11 +294,13 @@ async function removerUsuarioPorMac(mac, limparRadius = true) {
       success: false,
       message: "Erro durante o processo",
       error: err.message,
-      results: resultados
+      results: resultados,
     };
   } finally {
     if (conn) {
-      try { await conn.close(); } catch (e) {}
+      try {
+        await conn.close();
+      } catch (e) {}
     }
   }
 }
@@ -274,7 +318,7 @@ async function limparUsuarioRadius(mac) {
        WHERE ra.callingstationid = ?
        UNION
        SELECT username FROM radcheck WHERE username = ?`,
-      [mac, mac]
+      [mac, mac],
     );
 
     for (const { username } of checks) {

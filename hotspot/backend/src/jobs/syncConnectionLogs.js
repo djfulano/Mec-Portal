@@ -1,122 +1,71 @@
-/**
- * Sync job: radacct -> connection_logs
- * Transfers completed RADIUS sessions into the Marco Civil compliance table.
- *
- * Usage:
- *   node src/jobs/syncConnectionLogs.js
- *
- * Or import and call syncConnectionLogs() from a cron scheduler.
- */
-require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
-const db = require('../../db');
-
+require("dotenv").config({
+  path: require("path").join(__dirname, "..", "..", ".env"),
+  quiet: true,
+});
+const db = require("../../db");
 async function syncConnectionLogs() {
-  const conn = await db.getConnection();
-
+  const c = await db.getConnection();
   try {
-    // 1. Get last synced radacctid
-    const [syncRow] = await conn.execute(
-      'SELECT last_synced_radacctid FROM connection_logs_sync ORDER BY id DESC LIMIT 1'
+    const [[marker]] = await c.query(
+      "SELECT last_synced_radacctid FROM connection_logs_sync ORDER BY id LIMIT 1",
     );
-    const lastId = syncRow.length > 0 ? syncRow[0].last_synced_radacctid : 0;
-
-    console.log(`[syncConnectionLogs] Buscando sessoes com radacctid > ${lastId}...`);
-
-    // 2. Fetch completed sessions from radacct, joined with radius_users and leads
-    const [rows] = await conn.execute(
-      `SELECT
-        ra.radacctid,
-        m.empresa_id,
-        ra.username,
-        ll.cpf,
-        ra.callingstationid AS mac,
-        ra.framedipaddress AS ip_atribuido,
-        ra.nasipaddress AS nas_ip,
-        ra.acctstarttime AS inicio_conexao,
-        ra.acctstoptime AS fim_conexao,
-        ra.acctinputoctets AS bytes_entrada,
-        ra.acctoutputoctets AS bytes_saida,
-        ra.acctsessiontime AS duracao_segundos,
-        ra.acctterminatecause AS motivo_desconexao,
-        ra.acctauthentic AS auth_result
-      FROM radacct ra
-      INNER JOIN mikrotiks m ON m.ip COLLATE utf8mb4_unicode_ci = ra.nasipaddress COLLATE utf8mb4_unicode_ci
-      LEFT JOIN (
-         SELECT mac, empresa_id, MAX(cpf) as cpf
-         FROM leads
-         GROUP BY mac, empresa_id
-      ) ll ON ll.mac COLLATE utf8mb4_unicode_ci = ra.callingstationid COLLATE utf8mb4_unicode_ci AND ll.empresa_id = m.empresa_id
-      WHERE ra.radacctid > ? AND ra.acctstoptime IS NOT NULL
-      ORDER BY ra.radacctid ASC
-      LIMIT 5000`,
-      [lastId]
+    const last = Number(marker?.last_synced_radacctid) || 0;
+    const [rows] = await c.query(
+      `SELECT ra.*,m.empresa_id,m.id equipamento_id,g.unidade_id granted_unit,g.revision_id
+   FROM radacct ra JOIN mikrotiks m ON m.ip COLLATE utf8mb4_unicode_ci=ra.nasipaddress COLLATE utf8mb4_unicode_ci
+   LEFT JOIN access_grants g ON g.username COLLATE utf8mb4_unicode_ci=ra.username COLLATE utf8mb4_unicode_ci AND g.empresa_id=m.empresa_id
+   WHERE ra.radacctid>? OR EXISTS(SELECT 1 FROM connection_logs l WHERE l.radacct_id=ra.radacctid AND l.fim_conexao IS NULL)
+   ORDER BY (ra.radacctid>?) DESC,ra.radacctid LIMIT 5000`,
+      [last, last],
     );
-
-    if (rows.length === 0) {
-      console.log('[syncConnectionLogs] Nenhuma sessao nova para sincronizar.');
-      return { synced: 0 };
-    }
-
-    console.log(`[syncConnectionLogs] Encontradas ${rows.length} sessoes para sincronizar.`);
-
-    // 3. Insert into connection_logs in batches
-    let maxRadacctId = lastId;
-
-    for (const row of rows) {
-      await conn.execute(
-        `INSERT INTO connection_logs
-          (empresa_id, username, cpf, mac, ip_atribuido, nas_ip, inicio_conexao, fim_conexao,
-           bytes_entrada, bytes_saida, duracao_segundos, motivo_desconexao, auth_result)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    for (const r of rows) {
+      await c.query(
+        `INSERT INTO connection_logs(empresa_id,username,mac,ip_atribuido,nas_ip,inicio_conexao,fim_conexao,bytes_entrada,bytes_saida,duracao_segundos,motivo_desconexao,auth_result,unidade_id,equipamento_id,revision_id,radacct_id)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE fim_conexao=VALUES(fim_conexao),bytes_entrada=VALUES(bytes_entrada),bytes_saida=VALUES(bytes_saida),duracao_segundos=VALUES(duracao_segundos),motivo_desconexao=VALUES(motivo_desconexao)`,
         [
-          row.empresa_id,
-          row.username,
-          row.cpf || null,
-          row.mac || '',
-          row.ip_atribuido || '',
-          row.nas_ip || '',
-          row.inicio_conexao,
-          row.fim_conexao,
-          row.bytes_entrada || 0,
-          row.bytes_saida || 0,
-          row.duracao_segundos || 0,
-          row.motivo_desconexao || null,
-          row.auth_result || null
-        ]
+          r.empresa_id,
+          r.username,
+          r.callingstationid || "",
+          r.framedipaddress || "",
+          r.nasipaddress || "",
+          r.acctstarttime,
+          r.acctstoptime || null,
+          r.acctinputoctets || 0,
+          r.acctoutputoctets || 0,
+          r.acctsessiontime || 0,
+          r.acctterminatecause || null,
+          r.acctauthentic || null,
+          r.granted_unit || null,
+          r.equipamento_id,
+          r.revision_id || null,
+          r.radacctid,
+        ],
       );
-
-      if (row.radacctid > maxRadacctId) {
-        maxRadacctId = row.radacctid;
-      }
     }
-
-    // 4. Update sync tracking
-    await conn.execute(
-      'UPDATE connection_logs_sync SET last_synced_radacctid = ?, synced_at = NOW() ORDER BY id DESC LIMIT 1',
-      [maxRadacctId]
-    );
-
-    console.log(`[syncConnectionLogs] Sincronizadas ${rows.length} sessoes. Ultimo radacctid: ${maxRadacctId}`);
-    return { synced: rows.length, lastRadacctId: maxRadacctId };
-  } catch (err) {
-    console.error('[syncConnectionLogs] Erro:', err);
-    throw err;
+    if (rows.length) {
+      const max = Math.max(last, ...rows.map((r) => Number(r.radacctid)));
+      if (marker)
+        await c.query(
+          "UPDATE connection_logs_sync SET last_synced_radacctid=?,synced_at=NOW()",
+          [max],
+        );
+      else
+        await c.query(
+          "INSERT INTO connection_logs_sync(last_synced_radacctid) VALUES (?)",
+          [max],
+        );
+    }
+    return { synced: rows.length };
   } finally {
-    conn.release();
+    c.release();
   }
 }
-
 module.exports = syncConnectionLogs;
-
-// Run directly
-if (require.main === module) {
+if (require.main === module)
   syncConnectionLogs()
-    .then((result) => {
-      console.log('[syncConnectionLogs] Concluido:', result);
-      process.exit(0);
+    .then((r) => console.log(r))
+    .catch((e) => {
+      console.error(e.message);
+      process.exitCode = 1;
     })
-    .catch((err) => {
-      console.error('[syncConnectionLogs] Falha:', err);
-      process.exit(1);
-    });
-}
+    .finally(() => db.end());

@@ -1,13 +1,16 @@
 const db = require("../../db");
-const { DEFAULT_WHATSAPP_TEMPLATE, DEFAULT_PORTAL_PLANOS_CONFIG } = require("../constants/whatsappDefaults");
+const {
+  DEFAULT_WHATSAPP_TEMPLATE,
+  DEFAULT_PORTAL_PLANOS_CONFIG,
+} = require("../constants/whatsappDefaults");
 
 function gerarSlug(nome) {
   return nome
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 exports.listarEmpresas = async (req, res) => {
@@ -37,17 +40,24 @@ exports.criarEmpresa = async (req, res) => {
     let slug = gerarSlug(nome);
 
     // Garantir slug único
-    const [[existing]] = await db.execute('SELECT id FROM empresas WHERE slug = ?', [slug]);
+    const [[existing]] = await db.execute(
+      "SELECT id FROM empresas WHERE slug = ?",
+      [slug],
+    );
     if (existing) {
       slug = `${slug}-${Date.now().toString(36)}`;
     }
 
     const [result] = await db.execute(
       `INSERT INTO empresas (nome, slug, cnpj, email, telefone) VALUES (?, ?, ?, ?, ?)`,
-      [nome, slug, cnpj || null, email, telefone || null]
+      [nome, slug, cnpj || null, email, telefone || null],
     );
 
     const empresaId = result.insertId;
+    await db.query("INSERT INTO unidades(empresa_id,nome) VALUES (?,?)", [
+      empresaId,
+      "Unidade principal",
+    ]);
 
     // Auto-criar portais padrao para a nova empresa.
     // O portal 'planos' ja vem com configuracoes padrao (PIX + Cartao ativos +
@@ -62,12 +72,18 @@ exports.criarEmpresa = async (req, res) => {
        (?, 'Cadastro de LEAD (Sem Internet)', 'lead-passivo', 'lead_passivo', '/lead-passivo', 1, ?, NULL),
        (?, 'Acesso Wi-Fi', 'login', 'login', '/login-hotspot', 1, ?, NULL)`,
       [
-        empresaId, DEFAULT_WHATSAPP_TEMPLATE,
-        empresaId, DEFAULT_WHATSAPP_TEMPLATE, planosConfigJson,
-        empresaId, DEFAULT_WHATSAPP_TEMPLATE,
-        empresaId, DEFAULT_WHATSAPP_TEMPLATE,
-        empresaId, DEFAULT_WHATSAPP_TEMPLATE,
-      ]
+        empresaId,
+        DEFAULT_WHATSAPP_TEMPLATE,
+        empresaId,
+        DEFAULT_WHATSAPP_TEMPLATE,
+        planosConfigJson,
+        empresaId,
+        DEFAULT_WHATSAPP_TEMPLATE,
+        empresaId,
+        DEFAULT_WHATSAPP_TEMPLATE,
+        empresaId,
+        DEFAULT_WHATSAPP_TEMPLATE,
+      ],
     );
 
     res.status(201).json({ id: empresaId, nome, slug, email });
@@ -84,7 +100,15 @@ exports.atualizarEmpresa = async (req, res) => {
 
     await db.execute(
       `UPDATE empresas SET nome = ?, cnpj = ?, email = ?, telefone = ?, logo_url = ?, ativo = ? WHERE id = ?`,
-      [nome, cnpj || null, email, telefone || null, logo_url || null, ativo !== undefined ? ativo : 1, id]
+      [
+        nome,
+        cnpj || null,
+        email,
+        telefone || null,
+        logo_url || null,
+        ativo !== undefined ? ativo : 1,
+        id,
+      ],
     );
 
     res.json({ message: "Empresa atualizada" });
@@ -99,12 +123,17 @@ exports.deletarEmpresa = async (req, res) => {
     const { id } = req.params;
 
     // Não permitir deletar empresa padrão
-    const [[empresa]] = await db.execute('SELECT slug FROM empresas WHERE id = ?', [id]);
-    if (empresa && empresa.slug === 'default') {
-      return res.status(400).json({ message: "Não é possível deletar a empresa padrão" });
+    const [[empresa]] = await db.execute(
+      "SELECT slug FROM empresas WHERE id = ?",
+      [id],
+    );
+    if (empresa && empresa.slug === "default") {
+      return res
+        .status(400)
+        .json({ message: "Não é possível deletar a empresa padrão" });
     }
 
-    await db.execute('DELETE FROM empresas WHERE id = ?', [id]);
+    await db.execute("DELETE FROM empresas WHERE id = ?", [id]);
     res.json({ message: "Empresa deletada" });
   } catch (err) {
     console.error("Erro ao deletar empresa:", err);
@@ -115,7 +144,10 @@ exports.deletarEmpresa = async (req, res) => {
 exports.obterEmpresa = async (req, res) => {
   try {
     const { id } = req.params;
-    const [[empresa]] = await db.execute('SELECT * FROM empresas WHERE id = ?', [id]);
+    const [[empresa]] = await db.execute(
+      "SELECT * FROM empresas WHERE id = ?",
+      [id],
+    );
     if (!empresa) {
       return res.status(404).json({ message: "Empresa não encontrada" });
     }
@@ -135,7 +167,7 @@ exports.listarAdminsEmpresa = async (req, res) => {
        JOIN admins a ON ae.admin_id = a.id
        WHERE ae.empresa_id = ?
        ORDER BY a.nome`,
-      [id]
+      [id],
     );
     res.json(rows);
   } catch (err) {
@@ -149,16 +181,27 @@ exports.vincularAdmin = async (req, res) => {
     const { id } = req.params;
     const { admin_id, role } = req.body;
 
-    if (!admin_id) return res.status(400).json({ message: "admin_id obrigatório" });
-    const [admins] = await db.execute('SELECT role FROM admins WHERE id = ?', [admin_id]);
-    if (!admins.length) return res.status(404).json({ message: "Usuário não encontrado" });
-    if (admins[0].role === 'super_admin') return res.status(400).json({ message: "Superadmins têm acesso global e não são vinculados a empresas." });
-    if (role && !['owner', 'manager', 'operator'].includes(role)) return res.status(400).json({ message: "Perfil inválido" });
+    if (!admin_id)
+      return res.status(400).json({ message: "admin_id obrigatório" });
+    const [admins] = await db.execute("SELECT role FROM admins WHERE id = ?", [
+      admin_id,
+    ]);
+    if (!admins.length)
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    if (admins[0].role === "super_admin")
+      return res
+        .status(400)
+        .json({
+          message:
+            "Superadmins têm acesso global e não são vinculados a empresas.",
+        });
+    if (role && !["owner", "manager", "operator"].includes(role))
+      return res.status(400).json({ message: "Perfil inválido" });
 
     await db.execute(
       `INSERT INTO admin_empresas (admin_id, empresa_id, role) VALUES (?, ?, ?)
        ON DUPLICATE KEY UPDATE role = VALUES(role)`,
-      [admin_id, id, role || 'operator']
+      [admin_id, id, role || "operator"],
     );
 
     res.json({ message: "Admin vinculado com sucesso" });
@@ -173,8 +216,8 @@ exports.desvincularAdmin = async (req, res) => {
     const { id, adminId } = req.params;
 
     const [result] = await db.execute(
-      'DELETE FROM admin_empresas WHERE admin_id = ? AND empresa_id = ?',
-      [adminId, id]
+      "DELETE FROM admin_empresas WHERE admin_id = ? AND empresa_id = ?",
+      [adminId, id],
     );
 
     if (result.affectedRows === 0) {
@@ -191,7 +234,11 @@ exports.desvincularAdmin = async (req, res) => {
 exports.listarTodosAdmins = async (req, res) => {
   try {
     const [rows] = await db.execute(
-      'SELECT id, email, nome, role FROM admins ORDER BY nome'
+      "SELECT id, email, nome, role FROM admins WHERE (? IS NULL OR empresa_id=?) ORDER BY nome",
+      [
+        req.user.role === "super_admin" ? null : req.user.empresa_id,
+        req.user.empresa_id || null,
+      ],
     );
     res.json(rows);
   } catch (err) {
@@ -199,4 +246,3 @@ exports.listarTodosAdmins = async (req, res) => {
     res.status(500).json({ message: "Erro ao listar admins" });
   }
 };
-

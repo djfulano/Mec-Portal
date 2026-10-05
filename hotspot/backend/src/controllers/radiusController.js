@@ -1,43 +1,50 @@
 // backend/src/controllers/radiusController.js
-const db = require('../../db');
+const db = require("../../db");
 
 // Cria um novo usuário no FreeRADIUS com isolamento por empresa
 async function criarUsuarioRadius(req, res) {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    return res.status(400).json({ error: 'Username e password são obrigatórios' });
+    return res
+      .status(400)
+      .json({ error: "Username e password são obrigatórios" });
   }
 
   try {
     // Verificar se já existe username em outra empresa
     const [[existente]] = await db.query(
-      'SELECT ru.empresa_id FROM radius_users ru WHERE ru.username = ?',
-      [username]
+      "SELECT ru.empresa_id FROM radius_users ru WHERE ru.username = ?",
+      [username],
     );
     if (existente && existente.empresa_id !== req.empresa_id) {
-      return res.status(400).json({ error: 'Username já em uso por outra empresa' });
+      return res
+        .status(400)
+        .json({ error: "Username já em uso por outra empresa" });
     }
 
     // Limpa entradas antigas do mesmo username
-    await db.query('DELETE FROM radcheck WHERE username = ?', [username]);
+    await db.query("DELETE FROM radcheck WHERE username = ?", [username]);
 
     await db.query(
       'INSERT INTO radcheck (username, attribute, op, value) VALUES (?, "Cleartext-Password", ":=", ?)',
-      [username, password]
+      [username, password],
     );
 
     // Registrar na radius_users com empresa_id
-    await db.query(`
+    await db.query(
+      `
       INSERT INTO radius_users (empresa_id, username)
       VALUES (?, ?)
       ON DUPLICATE KEY UPDATE empresa_id = VALUES(empresa_id)
-    `, [req.empresa_id, username]);
+    `,
+      [req.empresa_id, username],
+    );
 
-    res.status(201).json({ message: 'Usuário RADIUS criado com sucesso.' });
+    res.status(201).json({ message: "Usuário RADIUS criado com sucesso." });
   } catch (error) {
-    console.error('Erro ao criar usuário RADIUS:', error);
-    res.status(500).json({ error: 'Erro ao criar usuário RADIUS.' });
+    console.error("Erro ao criar usuário RADIUS:", error);
+    res.status(500).json({ error: "Erro ao criar usuário RADIUS." });
   }
 }
 
@@ -47,35 +54,40 @@ const vincularPlano = async (req, res) => {
   try {
     // Verificar se o username pertence a esta empresa
     const [[ru]] = await db.query(
-      'SELECT id FROM radius_users WHERE username = ? AND empresa_id = ?',
-      [username, req.empresa_id]
+      "SELECT id FROM radius_users WHERE username = ? AND empresa_id = ?",
+      [username, req.empresa_id],
     );
     if (!ru) {
-      return res.status(404).json({ error: 'Usuário não encontrado nesta empresa' });
+      return res
+        .status(404)
+        .json({ error: "Usuário não encontrado nesta empresa" });
     }
 
     const [[plano]] = await db.query(
-      'SELECT id, nome, velocidade_down, velocidade_up, duracao_minutos, mikrotik_id, shared_users FROM planos WHERE id = ? AND empresa_id = ?',
-      [planoId, req.empresa_id]
+      "SELECT id, nome, velocidade_down, velocidade_up, duracao_minutos, mikrotik_id, shared_users FROM planos WHERE id = ? AND empresa_id = ?",
+      [planoId, req.empresa_id],
     );
-    if (!plano) return res.status(404).json({ error: 'Plano não encontrado' });
+    if (!plano) return res.status(404).json({ error: "Plano não encontrado" });
 
     const tempoSegundos = plano.duracao_minutos * 60;
     const sharedUsers = plano.shared_users || 1;
 
     // Apaga check antigos (exceto password)
-    await db.query('DELETE FROM radcheck WHERE username = ? AND attribute != "Cleartext-Password"', [username]);
+    await db.query(
+      'DELETE FROM radcheck WHERE username = ? AND attribute != "Cleartext-Password"',
+      [username],
+    );
     // Apaga replies antigos
-    await db.query('DELETE FROM radreply WHERE username = ?', [username]);
+    await db.query("DELETE FROM radreply WHERE username = ?", [username]);
     // Apaga grupos antigos
-    await db.query('DELETE FROM radusergroup WHERE username = ?', [username]);
+    await db.query("DELETE FROM radusergroup WHERE username = ?", [username]);
 
     // Adiciona Max-Daily-Session e Simultaneous-Use no radcheck
     await db.query(
       `INSERT INTO radcheck (username, attribute, op, value) VALUES
        (?, 'Max-Daily-Session', ':=', ?),
        (?, 'Simultaneous-Use', ':=', ?)`,
-      [username, String(tempoSegundos), username, String(sharedUsers)]
+      [username, String(tempoSegundos), username, String(sharedUsers)],
     );
 
     // Adiciona replies para banda e tempo
@@ -87,31 +99,42 @@ const vincularPlano = async (req, res) => {
         username,
         `${plano.velocidade_up}M/${plano.velocidade_down}M`,
         username,
-        String(tempoSegundos)
-      ]
+        String(tempoSegundos),
+      ],
     );
 
     // Define grupo
     await db.query(
-      'INSERT INTO radusergroup (username, groupname) VALUES (?, ?)',
-      [username, String(plano.id)]
+      "INSERT INTO radusergroup (username, groupname) VALUES (?, ?)",
+      [username, String(plano.id)],
     );
 
     // Atualiza vínculo em radius_users
-    await db.query(`
+    await db.query(
+      `
       UPDATE radius_users SET plano_id = ?, nas_id = ? WHERE username = ? AND empresa_id = ?
-    `, [plano.id, plano.mikrotik_id, username, req.empresa_id]);
+    `,
+      [plano.id, plano.mikrotik_id, username, req.empresa_id],
+    );
 
-    res.status(200).json({ message: 'Plano vinculado ao usuário com sucesso.' });
+    await require("../services/bindLegacyNas")(
+      username,
+      plano.mikrotik_id,
+      req.empresa_id,
+    );
+    res
+      .status(200)
+      .json({ message: "Plano vinculado ao usuário com sucesso." });
   } catch (error) {
-    console.error('Erro ao vincular plano:', error);
-    res.status(500).json({ error: 'Erro ao vincular plano ao usuário.' });
+    console.error("Erro ao vincular plano:", error);
+    res.status(500).json({ error: "Erro ao vincular plano ao usuário." });
   }
 };
 
 const listarUsuarios = async (req, res) => {
   try {
-    const [usuarios] = await db.query(`
+    const [usuarios] = await db.query(
+      `
       SELECT
         rc.username,
         rc.value AS senha,
@@ -129,12 +152,14 @@ const listarUsuarios = async (req, res) => {
       WHERE rc.attribute = 'Cleartext-Password'
         AND ru.empresa_id = ?
       ORDER BY ru.criado_em DESC
-    `, [req.empresa_id]);
+    `,
+      [req.empresa_id],
+    );
 
     res.json(usuarios);
   } catch (error) {
-    console.error('Erro ao listar usuários RADIUS:', error);
-    res.status(500).json({ error: 'Erro ao listar usuários' });
+    console.error("Erro ao listar usuários RADIUS:", error);
+    res.status(500).json({ error: "Erro ao listar usuários" });
   }
 };
 
@@ -143,27 +168,31 @@ async function deletarUsuarioRadius(req, res) {
 
   try {
     const [[ru]] = await db.query(
-      'SELECT id FROM radius_users WHERE username = ? AND empresa_id = ?',
-      [username, req.empresa_id]
+      "SELECT id FROM radius_users WHERE username = ? AND empresa_id = ?",
+      [username, req.empresa_id],
     );
-    if (!ru) return res.status(404).json({ error: 'Usuário não encontrado nesta empresa' });
+    if (!ru)
+      return res
+        .status(404)
+        .json({ error: "Usuário não encontrado nesta empresa" });
 
-    await db.query('DELETE FROM radcheck WHERE username = ?', [username]);
-    await db.query('DELETE FROM radreply WHERE username = ?', [username]);
-    await db.query('DELETE FROM radusergroup WHERE username = ?', [username]);
-    await db.query('DELETE FROM radpostauth WHERE username = ?', [username]);
-    await db.query('DELETE FROM radius_users WHERE username = ?', [username]);
+    await db.query("DELETE FROM radcheck WHERE username = ?", [username]);
+    await db.query("DELETE FROM radreply WHERE username = ?", [username]);
+    await db.query("DELETE FROM radusergroup WHERE username = ?", [username]);
+    // Preserve authentication history when revoking access.
+    await db.query("DELETE FROM radius_users WHERE username = ?", [username]);
 
-    res.status(200).json({ message: 'Usuário RADIUS deletado com sucesso.' });
+    res.status(200).json({ message: "Usuário RADIUS deletado com sucesso." });
   } catch (error) {
-    console.error('Erro ao deletar usuário RADIUS:', error);
-    res.status(500).json({ error: 'Erro ao deletar usuário RADIUS.' });
+    console.error("Erro ao deletar usuário RADIUS:", error);
+    res.status(500).json({ error: "Erro ao deletar usuário RADIUS." });
   }
 }
 
 const listarSessoesAtivas = async (req, res) => {
   try {
-    const [sessoes] = await db.query(`
+    const [sessoes] = await db.query(
+      `
       SELECT
         ra.username,
         ll.cpf,
@@ -184,7 +213,9 @@ const listarSessoesAtivas = async (req, res) => {
       WHERE ra.acctstoptime IS NULL
         AND m.empresa_id = ?
       ORDER BY ra.acctstarttime DESC
-    `, [req.empresa_id]);
+    `,
+      [req.empresa_id],
+    );
 
     res.json(sessoes);
   } catch (error) {
@@ -198,5 +229,5 @@ module.exports = {
   vincularPlano,
   listarUsuarios,
   deletarUsuarioRadius,
-  listarSessoesAtivas
+  listarSessoesAtivas,
 };

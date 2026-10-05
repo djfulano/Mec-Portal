@@ -22,7 +22,7 @@ async function gerarAcessoTemporario(mac, ip, planoId, empresaId, opts = {}) {
        WHERE rc.username LIKE ? AND rc.username NOT IN (
          SELECT username FROM radacct WHERE acctstoptime IS NULL
        )`,
-      [prefixo]
+      [prefixo],
     );
     for (const { username: oldUser } of antigos) {
       await db.query("DELETE FROM radcheck WHERE username = ?", [oldUser]);
@@ -36,14 +36,14 @@ async function gerarAcessoTemporario(mac, ip, planoId, empresaId, opts = {}) {
        (?, 'Cleartext-Password', ':=', ?),
        (?, 'Session-Timeout', ':=', ?),
        (?, 'Simultaneous-Use', ':=', '1')`,
-      [username, senha, username, String(tempoSegundos), username]
+      [username, senha, username, String(tempoSegundos), username],
     );
 
     await db.query(
       `INSERT INTO radreply (username, attribute, op, value) VALUES
         (?, 'Mikrotik-Rate-Limit', ':=', ?),
         (?, 'Session-Timeout', ':=', ?)`,
-      [username, rateLimit, username, String(tempoSegundos)]
+      [username, rateLimit, username, String(tempoSegundos)],
     );
 
     // Busca o Mikrotik vinculado ao plano (filtrando por empresa)
@@ -60,20 +60,24 @@ async function gerarAcessoTemporario(mac, ip, planoId, empresaId, opts = {}) {
 
     const [mtk] = await db.query(
       "SELECT end_hotspot FROM mikrotiks WHERE id = ? LIMIT 1",
-      [mikrotikId]
+      [mikrotikId],
     );
 
     const gateway = mtk[0]?.end_hotspot || "192.168.0.1";
 
     // Registrar em radius_users para visibilidade
     if (empresaId && mikrotikId) {
-      await db.query(`
+      await db.query(
+        `
         INSERT INTO radius_users (empresa_id, username, plano_id, nas_id)
         VALUES (?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE plano_id = VALUES(plano_id)
-      `, [empresaId, username, planoId, mikrotikId]);
+      `,
+        [empresaId, username, planoId, mikrotikId],
+      );
     }
 
+    await require("../services/bindLegacyNas")(username, mikrotikId, empresaId);
     return { username, password: senha, gateway };
   } catch (err) {
     console.error("Erro ao gerar acesso temporario:", err);

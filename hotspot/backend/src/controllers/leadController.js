@@ -8,12 +8,17 @@ exports.capturaPassiva = async (req, res) => {
     const { nome, email, telefone, cpf, mac, ip, mikrotik_id } = req.body;
 
     if (!telefone && !email) {
-      return res.status(400).json({ message: "Telefone ou email são obrigatórios" });
+      return res
+        .status(400)
+        .json({ message: "Telefone ou email são obrigatórios" });
     }
 
     let empresaId = null;
     if (mikrotik_id) {
-      const [[mtk]] = await db.execute("SELECT empresa_id FROM mikrotiks WHERE id = ?", [mikrotik_id]);
+      const [[mtk]] = await db.execute(
+        "SELECT empresa_id FROM mikrotiks WHERE id = ?",
+        [mikrotik_id],
+      );
       empresaId = mtk?.empresa_id || null;
     }
 
@@ -21,7 +26,12 @@ exports.capturaPassiva = async (req, res) => {
     if (cpf) {
       const existing = await verificarLeadExistente(cpf, empresaId);
       if (existing) {
-        return res.status(409).json({ message: "Este CPF já está cadastrado em nosso sistema.", duplicado: true });
+        return res
+          .status(409)
+          .json({
+            message: "Este CPF já está cadastrado em nosso sistema.",
+            duplicado: true,
+          });
       }
     }
 
@@ -30,7 +40,15 @@ exports.capturaPassiva = async (req, res) => {
     await db.execute(
       `INSERT INTO leads (empresa_id, nome, email, telefone, cpf, mac, ip, origem, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'portal_passivo', 'novo')`,
-      [empresaId, nome || null, email || null, telefone || null, cpfLimpo, mac || null, ip || null]
+      [
+        empresaId,
+        nome || null,
+        email || null,
+        telefone || null,
+        cpfLimpo,
+        mac || null,
+        ip || null,
+      ],
     );
 
     // Buscar config de redirect do portal lead_passivo desta empresa
@@ -39,7 +57,7 @@ exports.capturaPassiva = async (req, res) => {
     if (empresaId) {
       const [[portal]] = await db.execute(
         "SELECT configuracoes FROM portais WHERE tipo = 'lead_passivo' AND empresa_id = ? LIMIT 1",
-        [empresaId]
+        [empresaId],
       );
       if (portal?.configuracoes) {
         try {
@@ -58,7 +76,7 @@ exports.capturaPassiva = async (req, res) => {
       try {
         const [[portalP]] = await db.execute(
           "SELECT id FROM portais WHERE tipo = 'lead_passivo' AND empresa_id = ? LIMIT 1",
-          [empresaId]
+          [empresaId],
         );
         portalIdPassivo = portalP?.id || null;
       } catch (_) {}
@@ -76,7 +94,9 @@ exports.capturaPassiva = async (req, res) => {
         nome: nome || null,
         cpf: cpfLimpo || "",
       },
-    }).catch(err => console.warn("[capturaPassiva] notificarLiberacao falhou:", err.message));
+    }).catch((err) =>
+      console.warn("[capturaPassiva] notificarLiberacao falhou:", err.message),
+    );
 
     return res.json({
       success: true,
@@ -86,10 +106,11 @@ exports.capturaPassiva = async (req, res) => {
     });
   } catch (err) {
     console.error("Erro Captura Passiva Lead:", err);
-    return res.status(500).json({ message: "Erro interno ao processar cadastro de Lead" });
+    return res
+      .status(500)
+      .json({ message: "Erro interno ao processar cadastro de Lead" });
   }
 };
-
 
 // Login público para portal Lead (cria RADIUS + retorna gateway)
 exports.leadLogin = async (req, res) => {
@@ -103,14 +124,17 @@ exports.leadLogin = async (req, res) => {
     // Resolver empresa_id via mikrotik_id
     let empresaId = null;
     if (mikrotik_id) {
-      const [[mtk]] = await db.execute("SELECT empresa_id FROM mikrotiks WHERE id = ?", [mikrotik_id]);
+      const [[mtk]] = await db.execute(
+        "SELECT empresa_id FROM mikrotiks WHERE id = ?",
+        [mikrotik_id],
+      );
       empresaId = mtk?.empresa_id || null;
     }
 
     // Username: usar telefone limpo, ou email, ou MAC
-    const telLimpo = telefone ? telefone.replace(/\D/g, '') : null;
+    const telLimpo = telefone ? telefone.replace(/\D/g, "") : null;
     const username = telLimpo || email || mac;
-    const senha = username;
+    const senha = require("crypto").randomBytes(24).toString("hex");
 
     // Busca plano Lead da empresa
     let planoQuery = `
@@ -129,14 +153,23 @@ exports.leadLogin = async (req, res) => {
     const [[plano]] = await db.query(planoQuery, planoParams);
 
     if (!plano) {
-      return res.status(404).json({ message: "Plano Lead não configurado. Crie um plano com nome 'Lead'." });
+      return res
+        .status(404)
+        .json({
+          message: "Plano Lead não configurado. Crie um plano com nome 'Lead'.",
+        });
     }
 
     // Verificar lead duplicado por CPF
     if (cpf) {
       const existing = await verificarLeadExistente(cpf, empresaId);
       if (existing) {
-        return res.status(409).json({ message: "Este CPF já está cadastrado em nosso sistema.", duplicado: true });
+        return res
+          .status(409)
+          .json({
+            message: "Este CPF já está cadastrado em nosso sistema.",
+            duplicado: true,
+          });
       }
     }
 
@@ -145,7 +178,15 @@ exports.leadLogin = async (req, res) => {
       await db.execute(
         `INSERT INTO leads (empresa_id, nome, email, telefone, cpf, mac, ip, origem, lgpd_aceite, lgpd_aceite_em)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'portal_lead', 1, NOW())`,
-        [empresaId, nome || null, email || null, telefone || null, cpf || null, mac || null, ip || null]
+        [
+          empresaId,
+          nome || null,
+          email || null,
+          telefone || null,
+          cpf || null,
+          mac || null,
+          ip || null,
+        ],
       );
     } catch (leadErr) {
       console.warn("Aviso: erro ao inserir lead:", leadErr.message);
@@ -155,7 +196,7 @@ exports.leadLogin = async (req, res) => {
     await db.query("DELETE FROM radcheck WHERE username = ?", [username]);
     await db.query("DELETE FROM radreply WHERE username = ?", [username]);
     await db.query("DELETE FROM radusergroup WHERE username = ?", [username]);
-    await db.query(`DELETE FROM radacct WHERE username = ? AND acctstarttime >= CURDATE()`, [username]);
+    // Histórico RADIUS preservado: reconexões não apagam sessões.
 
     const rateLimit = `${plano.velocidade_up}M/${plano.velocidade_down}M`;
     const tempoSegundos = plano.duracao_minutos * 60;
@@ -166,30 +207,44 @@ exports.leadLogin = async (req, res) => {
        VALUES (?, 'Cleartext-Password', ':=', ?),
               (?, 'Max-Daily-Session', ':=', ?),
               (?, 'Simultaneous-Use', ':=', ?)`,
-      [username, senha, username, String(tempoSegundos), username, String(sharedUsers)]
+      [
+        username,
+        senha,
+        username,
+        String(tempoSegundos),
+        username,
+        String(sharedUsers),
+      ],
     );
 
     await db.query(
       `INSERT INTO radreply (username, attribute, op, value)
        VALUES (?, 'Mikrotik-Rate-Limit', ':=', ?),
               (?, 'Session-Timeout', ':=', ?)`,
-      [username, rateLimit, username, tempoSegundos]
+      [username, rateLimit, username, tempoSegundos],
     );
 
     await db.query(
       "INSERT INTO radusergroup (username, groupname) VALUES (?, ?)",
-      [username, plano.id]
+      [username, plano.id],
     );
 
     await db.query(
       `INSERT INTO radius_users (empresa_id, username, plano_id, nas_id)
        VALUES (?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE plano_id = VALUES(plano_id), nas_id = VALUES(nas_id), empresa_id = VALUES(empresa_id)`,
-      [empresaId, username, plano.id, plano.mikrotik_id]
+      [empresaId, username, plano.id, plano.mikrotik_id],
     );
 
+    await require("../services/bindLegacyNas")(
+      username,
+      plano.mikrotik_id,
+      empresaId,
+    );
     const gateway = plano.end_hotspot || ip;
-    const loginUrl = gateway ? `http://${gateway}/login?username=${username}&password=${senha}` : "";
+    const loginUrl = gateway
+      ? `http://${gateway}/login?username=${username}&password=${senha}`
+      : "";
 
     // Resolver portal_id Lead da empresa para notificacao WhatsApp
     let portalId = null;
@@ -197,7 +252,7 @@ exports.leadLogin = async (req, res) => {
       try {
         const [[portalLead]] = await db.execute(
           "SELECT id FROM portais WHERE tipo = 'lead' AND empresa_id = ? LIMIT 1",
-          [empresaId]
+          [empresaId],
         );
         portalId = portalLead?.id || null;
       } catch (_) {}
@@ -221,12 +276,16 @@ exports.leadLogin = async (req, res) => {
         login_url: loginUrl,
         cpf: cpf ? cpf.replace(/\D/g, "") : "",
       },
-    }).catch(err => console.warn("[leadLogin] notificarLiberacao falhou:", err.message));
+    }).catch((err) =>
+      console.warn("[leadLogin] notificarLiberacao falhou:", err.message),
+    );
 
     return res.json({ success: true, gateway, username, password: senha });
   } catch (err) {
     console.error("Erro Lead Login:", err);
-    return res.status(500).json({ message: "Erro interno ao processar login Lead" });
+    return res
+      .status(500)
+      .json({ message: "Erro interno ao processar login Lead" });
   }
 };
 
@@ -259,7 +318,18 @@ exports.listarLeads = async (req, res) => {
 
 exports.criarLead = async (req, res) => {
   try {
-    const { nome, email, telefone, cpf, mac, ip, status, origem, observacoes, lgpd_aceite } = req.body;
+    const {
+      nome,
+      email,
+      telefone,
+      cpf,
+      mac,
+      ip,
+      status,
+      origem,
+      observacoes,
+      lgpd_aceite,
+    } = req.body;
 
     const [result] = await db.execute(
       `INSERT INTO leads (empresa_id, nome, email, telefone, cpf, mac, ip, status, origem, observacoes, lgpd_aceite)
@@ -275,11 +345,13 @@ exports.criarLead = async (req, res) => {
         status || "novo",
         origem || "manual",
         observacoes || null,
-        lgpd_aceite ? 1 : 0
-      ]
+        lgpd_aceite ? 1 : 0,
+      ],
     );
 
-    res.status(201).json({ id: result.insertId, message: "Lead criado com sucesso" });
+    res
+      .status(201)
+      .json({ id: result.insertId, message: "Lead criado com sucesso" });
   } catch (err) {
     console.error("Erro ao criar lead:", err);
     res.status(500).json({ message: "Erro ao criar lead" });
@@ -294,12 +366,30 @@ exports.atualizarLead = async (req, res) => {
     const fields = [];
     const params = [];
 
-    if (nome !== undefined) { fields.push("nome = ?"); params.push(nome); }
-    if (email !== undefined) { fields.push("email = ?"); params.push(email); }
-    if (telefone !== undefined) { fields.push("telefone = ?"); params.push(telefone); }
-    if (cpf !== undefined) { fields.push("cpf = ?"); params.push(cpf); }
-    if (status !== undefined) { fields.push("status = ?"); params.push(status); }
-    if (observacoes !== undefined) { fields.push("observacoes = ?"); params.push(observacoes); }
+    if (nome !== undefined) {
+      fields.push("nome = ?");
+      params.push(nome);
+    }
+    if (email !== undefined) {
+      fields.push("email = ?");
+      params.push(email);
+    }
+    if (telefone !== undefined) {
+      fields.push("telefone = ?");
+      params.push(telefone);
+    }
+    if (cpf !== undefined) {
+      fields.push("cpf = ?");
+      params.push(cpf);
+    }
+    if (status !== undefined) {
+      fields.push("status = ?");
+      params.push(status);
+    }
+    if (observacoes !== undefined) {
+      fields.push("observacoes = ?");
+      params.push(observacoes);
+    }
 
     if (fields.length === 0) {
       return res.status(400).json({ message: "Nenhum campo para atualizar" });
@@ -309,7 +399,7 @@ exports.atualizarLead = async (req, res) => {
 
     const [result] = await db.execute(
       `UPDATE leads SET ${fields.join(", ")} WHERE id = ? AND empresa_id = ?`,
-      params
+      params,
     );
 
     if (result.affectedRows === 0) {
@@ -329,7 +419,7 @@ exports.deletarLead = async (req, res) => {
 
     const [result] = await db.execute(
       "DELETE FROM leads WHERE id = ? AND empresa_id = ?",
-      [id, req.empresa_id]
+      [id, req.empresa_id],
     );
 
     if (result.affectedRows === 0) {
@@ -347,25 +437,28 @@ exports.exportarLeadsCSV = async (req, res) => {
   try {
     const [rows] = await db.query(
       "SELECT nome, email, telefone, cpf, mac, ip, status, origem, observacoes, lgpd_aceite, criado_em FROM leads WHERE empresa_id = ? ORDER BY criado_em DESC",
-      [req.empresa_id]
+      [req.empresa_id],
     );
 
-    const header = "Nome,Email,Telefone,CPF,MAC,IP,Status,Origem,Observacoes,LGPD Aceite,Criado Em\n";
-    const csvRows = rows.map(r => {
-      return [
-        `"${(r.nome || '').replace(/"/g, '""')}"`,
-        `"${(r.email || '').replace(/"/g, '""')}"`,
-        `"${(r.telefone || '').replace(/"/g, '""')}"`,
-        `"${(r.cpf || '').replace(/"/g, '""')}"`,
-        `"${(r.mac || '').replace(/"/g, '""')}"`,
-        `"${(r.ip || '').replace(/"/g, '""')}"`,
-        `"${r.status}"`,
-        `"${r.origem}"`,
-        `"${(r.observacoes || '').replace(/"/g, '""')}"`,
-        r.lgpd_aceite ? "Sim" : "Não",
-        `"${r.criado_em ? new Date(r.criado_em).toLocaleString('pt-BR') : ''}"`
-      ].join(",");
-    }).join("\n");
+    const header =
+      "Nome,Email,Telefone,CPF,MAC,IP,Status,Origem,Observacoes,LGPD Aceite,Criado Em\n";
+    const csvRows = rows
+      .map((r) => {
+        return [
+          `"${(r.nome || "").replace(/"/g, '""')}"`,
+          `"${(r.email || "").replace(/"/g, '""')}"`,
+          `"${(r.telefone || "").replace(/"/g, '""')}"`,
+          `"${(r.cpf || "").replace(/"/g, '""')}"`,
+          `"${(r.mac || "").replace(/"/g, '""')}"`,
+          `"${(r.ip || "").replace(/"/g, '""')}"`,
+          `"${r.status}"`,
+          `"${r.origem}"`,
+          `"${(r.observacoes || "").replace(/"/g, '""')}"`,
+          r.lgpd_aceite ? "Sim" : "Não",
+          `"${r.criado_em ? new Date(r.criado_em).toLocaleString("pt-BR") : ""}"`,
+        ].join(",");
+      })
+      .join("\n");
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", "attachment; filename=leads.csv");
@@ -382,12 +475,17 @@ exports.cadastroCliente = async (req, res) => {
     const { nome, email, telefone, cpf, mac, ip, mikrotik_id } = req.body;
 
     if (!nome || !email || !telefone || !cpf) {
-      return res.status(400).json({ message: "Nome, email, telefone e CPF são obrigatórios" });
+      return res
+        .status(400)
+        .json({ message: "Nome, email, telefone e CPF são obrigatórios" });
     }
 
     let empresaId = null;
     if (mikrotik_id) {
-      const [[mtk]] = await db.execute("SELECT empresa_id FROM mikrotiks WHERE id = ?", [mikrotik_id]);
+      const [[mtk]] = await db.execute(
+        "SELECT empresa_id FROM mikrotiks WHERE id = ?",
+        [mikrotik_id],
+      );
       empresaId = mtk?.empresa_id || null;
     }
 
@@ -410,22 +508,45 @@ exports.cadastroCliente = async (req, res) => {
              ip = COALESCE(?, ip)
            WHERE id = ?${empresaId ? " AND empresa_id = ?" : ""}`,
           empresaId
-            ? [nome || null, email || null, telefone || null, mac || null, ip || null, existing.id, empresaId]
-            : [nome || null, email || null, telefone || null, mac || null, ip || null, existing.id]
+            ? [
+                nome || null,
+                email || null,
+                telefone || null,
+                mac || null,
+                ip || null,
+                existing.id,
+                empresaId,
+              ]
+            : [
+                nome || null,
+                email || null,
+                telefone || null,
+                mac || null,
+                ip || null,
+                existing.id,
+              ],
         );
       } catch (updErr) {
-        console.warn("Aviso: falha ao atualizar lead existente:", updErr.message);
+        console.warn(
+          "Aviso: falha ao atualizar lead existente:",
+          updErr.message,
+        );
       }
 
       // Verificar se tem plano ativo no RADIUS
       try {
         const [radcheckRows] = await db.query(
-          "SELECT attribute, value FROM radcheck WHERE username = ?", [cpfLimpo]
+          "SELECT attribute, value FROM radcheck WHERE username = ?",
+          [cpfLimpo],
         );
 
         if (radcheckRows.length > 0) {
-          const maxSessionRow = radcheckRows.find(r => r.attribute === "Max-Daily-Session");
-          const passwordRow = radcheckRows.find(r => r.attribute === "Cleartext-Password");
+          const maxSessionRow = radcheckRows.find(
+            (r) => r.attribute === "Max-Daily-Session",
+          );
+          const passwordRow = radcheckRows.find(
+            (r) => r.attribute === "Cleartext-Password",
+          );
           const maxSession = maxSessionRow ? parseInt(maxSessionRow.value) : 0;
           const password = passwordRow ? passwordRow.value : cpfLimpo;
 
@@ -433,7 +554,8 @@ exports.cadastroCliente = async (req, res) => {
           const [[acctResult]] = await db.query(
             `SELECT COALESCE(SUM(acctsessiontime), 0) as usado
              FROM radacct
-             WHERE username = ? AND DATE(acctstarttime) = CURDATE()`, [cpfLimpo]
+             WHERE username = ? AND DATE(acctstarttime) = CURDATE()`,
+            [cpfLimpo],
           );
           const tempoUsado = acctResult.usado || 0;
 
@@ -442,16 +564,22 @@ exports.cadastroCliente = async (req, res) => {
             let gateway = null;
             if (empresaId) {
               const [[mk]] = await db.query(
-                "SELECT end_hotspot, ip FROM mikrotiks WHERE empresa_id = ? LIMIT 1", [empresaId]
+                "SELECT end_hotspot, ip FROM mikrotiks WHERE empresa_id = ? LIMIT 1",
+                [empresaId],
               );
               gateway = mk?.end_hotspot || mk?.ip || null;
             }
 
             return res.json({
-              id: existing.id, nome: existing.nome, email: existing.email,
-              existente: true, planoAtivo: true,
-              gateway, username: cpfLimpo, password,
-              tempoRestante: maxSession - tempoUsado
+              id: existing.id,
+              nome: existing.nome,
+              email: existing.email,
+              existente: true,
+              planoAtivo: true,
+              gateway,
+              username: cpfLimpo,
+              password,
+              tempoRestante: maxSession - tempoUsado,
             });
           }
         }
@@ -460,7 +588,13 @@ exports.cadastroCliente = async (req, res) => {
       }
 
       // Sem plano ativo — segue para planos
-      return res.json({ id: existing.id, nome: existing.nome, email: existing.email, existente: true, planoAtivo: false });
+      return res.json({
+        id: existing.id,
+        nome: existing.nome,
+        email: existing.email,
+        existente: true,
+        planoAtivo: false,
+      });
     }
 
     const cpfLimpo = cpf.replace(/\D/g, "");
@@ -468,7 +602,7 @@ exports.cadastroCliente = async (req, res) => {
     const [result] = await db.execute(
       `INSERT INTO leads (empresa_id, nome, email, telefone, cpf, mac, ip, origem, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'portal_planos', 'novo')`,
-      [empresaId, nome, email, telefone, cpfLimpo, mac || null, ip || null]
+      [empresaId, nome, email, telefone, cpfLimpo, mac || null, ip || null],
     );
 
     res.json({ id: result.insertId, nome, email, existente: false });

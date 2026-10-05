@@ -1,0 +1,8 @@
+# Managed portals only authorize credentials granted by the portal's published flow.
+mec_portal {
+    if ("%{sql:SELECT COUNT(*) FROM mikrotiks m JOIN portais p ON p.id=m.portal_id WHERE m.ip='%{NAS-IP-Address}' AND p.managed=1}" != "0") {
+        if ("%{sql:SELECT COUNT(*) FROM access_grants g JOIN mikrotiks m ON m.id=g.equipamento_id WHERE g.username='%{SQL-User-Name}' AND m.ip='%{NAS-IP-Address}' AND g.expires_at>NOW()}" != "1") {
+            reject
+        }
+    }
+}

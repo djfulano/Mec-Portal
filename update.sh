@@ -52,6 +52,7 @@ rollback_code() {
 trap 'rollback_code; exit 1' ERR
 cd "$STAGE/hotspot/backend"
 node deploy-migrations.js
+node configure-radius-privacy.js "$BACKUP"
 rsync -a --delete --exclude=.env --exclude=uploads/ --exclude=certificados/ --exclude=tokens/ "$STAGE/hotspot/backend/" "$APP/backend/"
 rsync -a --delete --exclude=public/uploads/ --exclude=dist/uploads/ "$STAGE/hotspot/frontend/" "$APP/frontend/"
 pm2 restart hotspot-api --update-env

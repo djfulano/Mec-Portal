@@ -19,13 +19,15 @@ exports.registrarEmpresa = async (req, res) => {
     const { nome, email, cnpj, telefone, senha } = req.body;
 
     if (!nome || !email || !senha) {
-      return res.status(400).json({ message: "Nome, email e senha são obrigatórios" });
+      return res
+        .status(400)
+        .json({ message: "Nome, email e senha são obrigatórios" });
     }
 
     // Verificar se email já existe
     const [[existingAdmin]] = await conn.execute(
       "SELECT id FROM admins WHERE email = ?",
-      [email]
+      [email],
     );
     if (existingAdmin) {
       return res.status(400).json({ message: "Email já cadastrado" });
@@ -35,7 +37,7 @@ exports.registrarEmpresa = async (req, res) => {
     let slug = gerarSlug(nome);
     const [[existingSlug]] = await conn.execute(
       "SELECT id FROM empresas WHERE slug = ?",
-      [slug]
+      [slug],
     );
     if (existingSlug) {
       slug = `${slug}-${Date.now().toString(36)}`;
@@ -46,17 +48,25 @@ exports.registrarEmpresa = async (req, res) => {
     // Criar empresa
     const [empresaResult] = await conn.execute(
       `INSERT INTO empresas (nome, slug, cnpj, email, telefone) VALUES (?, ?, ?, ?, ?)`,
-      [nome, slug, cnpj || null, email, telefone || null]
+      [nome, slug, cnpj || null, email, telefone || null],
     );
     const empresaId = empresaResult.insertId;
+    await conn.query("INSERT INTO unidades(empresa_id,nome) VALUES (?,?)", [
+      empresaId,
+      "Unidade principal",
+    ]);
 
     // Criar admin owner
     const hashedPassword = await bcrypt.hash(senha, 10);
     const [adminResult] = await conn.execute(
       `INSERT INTO admins (empresa_id, email, nome, role, password) VALUES (?, ?, ?, 'owner', ?)`,
-      [empresaId, email, nome, hashedPassword]
+      [empresaId, email, nome, hashedPassword],
     );
     const adminId = adminResult.insertId;
+    await conn.query(
+      "INSERT INTO admin_empresas(admin_id,empresa_id,role) VALUES (?,?,'owner')",
+      [adminId, empresaId],
+    );
 
     await conn.commit();
 
@@ -70,7 +80,7 @@ exports.registrarEmpresa = async (req, res) => {
         role: "owner",
       },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "1d" },
     );
 
     res.status(201).json({
@@ -96,7 +106,9 @@ exports.registrarEmpresa = async (req, res) => {
   } catch (err) {
     await conn.rollback();
     console.error("Erro ao registrar empresa:", err);
-    res.status(500).json({ message: "Erro ao registrar empresa", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Erro ao registrar empresa", error: err.message });
   } finally {
     conn.release();
   }

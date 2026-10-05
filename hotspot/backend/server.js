@@ -1,34 +1,37 @@
-const systemUrl = require('./src/utils/systemUrl');
-require('dotenv').config()
-const express = require('express')
-const cors = require('cors')
-const path = require('path')
-const app = express()
+const systemUrl = require("./src/utils/systemUrl");
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
+const app = express();
 
 // Prevenir crash do processo por erros não tratados do node-routeros (!empty)
-process.on('uncaughtException', (err) => {
-  if (err.errno === 'UNKNOWNREPLY' || (err.message && err.message.includes('!empty'))) {
-    console.warn('RouterOS !empty reply handled (non-fatal)');
+process.on("uncaughtException", (err) => {
+  if (
+    err.errno === "UNKNOWNREPLY" ||
+    (err.message && err.message.includes("!empty"))
+  ) {
+    console.warn("RouterOS !empty reply handled (non-fatal)");
     return;
   }
-  console.error('Uncaught Exception:', err);
+  console.error("Uncaught Exception:", err);
   process.exit(1);
 });
 
 // Middlewares
-const auth = require('./src/middleware/auth')
-const tenant = require('./src/middleware/tenant')
+const auth = require("./src/middleware/auth");
+const tenant = require("./src/middleware/tenant");
 
 // Rotas
-const authRoutes = require('./src/routes/authRoutes')
-const planRoutes = require('./src/routes/planRoutes')
-const adminRoutes = require("./routes/admin")
+const authRoutes = require("./src/routes/authRoutes");
+const planRoutes = require("./src/routes/planRoutes");
+const adminRoutes = require("./routes/admin");
 const mikrotikRoutes = require("./src/routes/mikrotikRoutes");
 const efiRoutes = require("./src/routes/efiRoutes");
 const mercadoPagoRoutes = require("./src/routes/mercadoPagoRoutes");
 const planPublicRoutes = require("./src/routes/planPublicRoutes");
 const pagamentoRoutes = require("./src/routes/pagamentoRoutes");
-const radiusRoutes = require('./src/routes/radiusRoutes');
+const radiusRoutes = require("./src/routes/radiusRoutes");
 const dashboardRoutes = require("./src/routes/dashboardRoutes");
 const lgpdRoutes = require("./src/routes/lgpdRoutes");
 const whatsappRoutes = require("./src/routes/whatsappRoutes");
@@ -53,34 +56,65 @@ const systemUpdateRoutes = require("./src/routes/systemUpdateRoutes");
 const db = require("./db");
 
 // Rotas exclusivas do servidor principal (OTA updates) - não existem nos servidores de alunos
-const fs = require('fs');
-const updatePublishRoutes = fs.existsSync(__dirname + '/src/routes/updatePublishRoutes.js') ? require("./src/routes/updatePublishRoutes") : null;
-const updateCheckRoutes = fs.existsSync(__dirname + '/src/routes/updateCheckRoutes.js') ? require("./src/routes/updateCheckRoutes") : null;
+const fs = require("fs");
+const updatePublishRoutes = fs.existsSync(
+  __dirname + "/src/routes/updatePublishRoutes.js",
+)
+  ? require("./src/routes/updatePublishRoutes")
+  : null;
+const updateCheckRoutes = fs.existsSync(
+  __dirname + "/src/routes/updateCheckRoutes.js",
+)
+  ? require("./src/routes/updateCheckRoutes")
+  : null;
 
-app.use(cors())
-app.use(express.json())
+app.use(cors());
+app.use(express.json());
+app.set("trust proxy", "loopback");
+app.use(
+  [
+    "/api/lead-portal",
+    "/api/lgpd",
+    "/api/login-portal",
+    "/api/pagamentos",
+    "/api/auth/temp",
+  ],
+  require("./src/middleware/legacyCaptiveGuard"),
+);
+app.use("/api/captive", require("./src/routes/captiveRoutes"));
+app.use(
+  "/api/workspace",
+  auth,
+  tenant,
+  require("./src/routes/workspaceRoutes"),
+);
 
 // Servir arquivos de campanhas (publicos, com cache de 1 dia)
-app.use('/uploads/campanhas',
-  express.static(path.join(__dirname, 'uploads', 'campanhas'), {
-    maxAge: '1d',
+app.use(
+  "/uploads/campanhas",
+  express.static(path.join(__dirname, "uploads", "campanhas"), {
+    maxAge: "1d",
     fallthrough: false,
-  })
+  }),
 );
 
 // --- Rotas públicas (sem auth) ---
-app.use('/api/admin', adminRoutes)          // Login
-app.use('/api/auth', authRoutes)            // Auth
-app.use('/api/auth', authTempRoutes)        // Acesso temporário
+app.use("/api/admin", adminRoutes); // Login
+app.use("/api/auth", authRoutes); // Auth
+app.use("/api/auth", authTempRoutes); // Acesso temporário
 app.use("/api/planos-publicos", planPublicRoutes);
-app.use("/api/pagamentos", pagamentoRoutes);  // Inclui webhook público
-app.use("/api/lgpd", lgpdRoutes);             // LGPD login/cadastro são públicos
-app.use("/api/registro", registroRoutes);       // Registro público de empresas
+app.use("/api/pagamentos", pagamentoRoutes); // Inclui webhook público
+app.use("/api/lgpd", lgpdRoutes); // LGPD login/cadastro são públicos
+app.use("/api/registro", registroRoutes); // Registro público de empresas
 
 app.use("/api/public/campanha", campanhasPublicRoutes);
 
 // Rota pública para login do portal Lead (sem auth)
-const { leadLogin, capturaPassiva, cadastroCliente } = require("./src/controllers/leadController");
+const {
+  leadLogin,
+  capturaPassiva,
+  cadastroCliente,
+} = require("./src/controllers/leadController");
 app.post("/api/lead-portal/login", leadLogin);
 app.post("/api/lead-portal/passivo", capturaPassiva);
 app.post("/api/clientes/cadastro", cadastroCliente);
@@ -89,32 +123,103 @@ app.post("/api/clientes/cadastro", cadastroCliente);
 app.use("/api/login-portal", loginPortalRoutes);
 
 // --- Rotas protegidas (auth + tenant + permissão) ---
-const checkPermissao = require('./src/middleware/checkPermissao');
-app.use('/api/planos', auth, tenant, checkPermissao('planos'), planRoutes)
-app.use("/api/mikrotiks", auth, tenant, checkPermissao('mikrotiks'), mikrotikRoutes);
-app.use("/api/efi", auth, tenant, checkPermissao('configuracoes'), efiRoutes);
-app.use("/api/config-mercadopago", auth, tenant, checkPermissao('configuracoes'), mercadoPagoRoutes);
-app.use('/api/radius', auth, tenant, radiusRoutes);
-app.use("/api/dashboard", auth, tenant, checkPermissao('dashboard'), dashboardRoutes);
-app.use("/api/whatsapp", auth, tenant, checkPermissao('configuracoes'), whatsappRoutes);
-app.use("/api/limpeza", auth, tenant, checkPermissao('configuracoes'), limpezaRoutes);
-app.use("/api/radius-logs", auth, tenant, checkPermissao('sessoeslog'), radiusLogsRoutes);
-app.use("/api/admins", auth, tenant, checkPermissao('usuarios'), adminUserRoutes);
-app.use('/api/global-admins', auth, require('./src/middleware/authorize')('super_admin'), adminUserRoutes);
-app.use("/api/wireguard", auth, tenant, checkPermissao('vpn'), wireguardRoutes);
-app.use("/api/portais", auth, tenant, checkPermissao('portais'), portalRoutes);
-app.use("/api/campanhas", auth, tenant, checkPermissao('portais'), campanhasRoutes);
-app.use("/api/portal-templates", auth, tenant, checkPermissao('portais'), portalTemplateRoutes);
-app.use("/api/leads", auth, tenant, checkPermissao('leads'), leadRoutes);
-app.use("/api/compliance", auth, tenant, checkPermissao('compliance'), complianceRoutes);
-app.use("/api/empresa-config", auth, tenant, checkPermissao('configuracoes'), empresaConfigRoutes);
+const checkPermissao = require("./src/middleware/checkPermissao");
+app.use("/api/planos", auth, tenant, checkPermissao("planos"), planRoutes);
+app.use(
+  "/api/mikrotiks",
+  auth,
+  tenant,
+  checkPermissao("mikrotiks"),
+  mikrotikRoutes,
+);
+app.use("/api/efi", auth, tenant, checkPermissao("configuracoes"), efiRoutes);
+app.use(
+  "/api/config-mercadopago",
+  auth,
+  tenant,
+  checkPermissao("configuracoes"),
+  mercadoPagoRoutes,
+);
+app.use("/api/radius", auth, tenant, radiusRoutes);
+app.use(
+  "/api/dashboard",
+  auth,
+  tenant,
+  checkPermissao("dashboard"),
+  dashboardRoutes,
+);
+app.use(
+  "/api/whatsapp",
+  auth,
+  tenant,
+  checkPermissao("configuracoes"),
+  whatsappRoutes,
+);
+app.use(
+  "/api/limpeza",
+  auth,
+  tenant,
+  checkPermissao("configuracoes"),
+  limpezaRoutes,
+);
+app.use(
+  "/api/radius-logs",
+  auth,
+  tenant,
+  checkPermissao("sessoeslog"),
+  radiusLogsRoutes,
+);
+app.use(
+  "/api/admins",
+  auth,
+  tenant,
+  checkPermissao("usuarios"),
+  adminUserRoutes,
+);
+app.use(
+  "/api/global-admins",
+  auth,
+  require("./src/middleware/authorize")("super_admin"),
+  adminUserRoutes,
+);
+app.use("/api/wireguard", auth, tenant, checkPermissao("vpn"), wireguardRoutes);
+app.use("/api/portais", auth, tenant, checkPermissao("portais"), portalRoutes);
+app.use(
+  "/api/campanhas",
+  auth,
+  tenant,
+  checkPermissao("portais"),
+  campanhasRoutes,
+);
+app.use(
+  "/api/portal-templates",
+  auth,
+  tenant,
+  checkPermissao("portais"),
+  portalTemplateRoutes,
+);
+app.use("/api/leads", auth, tenant, checkPermissao("leads"), leadRoutes);
+app.use(
+  "/api/compliance",
+  auth,
+  tenant,
+  checkPermissao("compliance"),
+  complianceRoutes,
+);
+app.use(
+  "/api/empresa-config",
+  auth,
+  tenant,
+  checkPermissao("configuracoes"),
+  empresaConfigRoutes,
+);
 
 // Rota pública: config visual do portal (sem auth)
 const portalCtrl = require("./src/controllers/portalController");
 app.get("/api/portal-config/:tipo", portalCtrl.getPortalConfig);
 
 // --- Rotas super admin ---
-app.use("/api/empresas", empresaRoutes);  // Auth + authorize interno
+app.use("/api/empresas", empresaRoutes); // Auth + authorize interno
 app.use("/api/grupos-permissao", grupoPermissaoRoutes); // Auth + authorize interno
 app.use("/api/system-backup", systemBackupRoutes);
 app.use("/api/system-update", systemUpdateRoutes);
@@ -130,10 +235,10 @@ app.get("/api/hotspot-login/:mikrotikId", async (req, res) => {
     const [[mikrotik]] = await db.execute(
       `SELECT m.empresa_id, e.slug AS empresa_slug FROM mikrotiks m
        LEFT JOIN empresas e ON m.empresa_id = e.id WHERE m.id = ?`,
-      [mikrotikId]
+      [mikrotikId],
     );
-    const empresaId = mikrotik?.empresa_id || '';
-    const empresaSlug = mikrotik?.empresa_slug || 'default';
+    const empresaId = mikrotik?.empresa_id || "";
+    const empresaSlug = mikrotik?.empresa_slug || "default";
     const systemDomain = process.env.SYSTEM_DOMAIN || req.hostname;
     const portalUrl = `${systemUrl(systemDomain)}/hotspot/redirect/${mikrotikId}`;
     const fullUrl = `${portalUrl}?mac=$(mac)&ip=$(ip)&mikrotik_id=${mikrotikId}&empresa_id=${empresaId}&empresa=${empresaSlug}`;
@@ -394,25 +499,37 @@ app.get("/hotspot/redirect/:mikrotikId", async (req, res) => {
        FROM mikrotiks m
        LEFT JOIN empresas e ON m.empresa_id = e.id
        WHERE m.id = ?`,
-      [mikrotikId]
+      [mikrotikId],
     );
     if (!mikrotik || !mikrotik.portal_id) {
-      return res.status(404).send("<h1>Portal não configurado para este hotspot</h1>");
+      return res
+        .status(404)
+        .send("<h1>Portal não configurado para este hotspot</h1>");
     }
 
-    const [[portal]] = await db.execute("SELECT * FROM portais WHERE id = ?", [mikrotik.portal_id]);
+    const [[portal]] = await db.execute("SELECT * FROM portais WHERE id = ?", [
+      mikrotik.portal_id,
+    ]);
     if (!portal) {
       return res.status(404).send("<h1>Portal não encontrado</h1>");
     }
+    if (portal.managed && portal.published_revision_id) {
+      return res.redirect(
+        "/wifi/" +
+          mikrotik.id +
+          "?" +
+          new URLSearchParams({ mac: mac || "", ip: ip || "" }).toString(),
+      );
+    }
 
     const empresaId = mikrotik.empresa_id;
-    const empresaSlug = mikrotik.empresa_slug || 'default';
+    const empresaSlug = mikrotik.empresa_slug || "default";
 
     // Pré-portal: se o portal tem campanha ativa e usuario ainda nao viu, redireciona
-    if (portal.campanha_ativa_id && req.query.campanha_vista !== '1') {
+    if (portal.campanha_ativa_id && req.query.campanha_vista !== "1") {
       const qs = new URLSearchParams({
-        mac: mac || '',
-        ip: ip || '',
+        mac: mac || "",
+        ip: ip || "",
         mikrotik_id: mikrotikId,
         empresa_id: empresaId,
         empresa: empresaSlug,
@@ -432,7 +549,10 @@ app.get("/hotspot/redirect/:mikrotikId", async (req, res) => {
 
       // Injetar CSS customizado se existir
       if (portal.custom_css) {
-        html = html.replace('</head>', `<style>${portal.custom_css}</style></head>`);
+        html = html.replace(
+          "</head>",
+          `<style>${portal.custom_css}</style></head>`,
+        );
       }
 
       res.setHeader("Content-Type", "text/html");
@@ -451,25 +571,29 @@ app.get("/hotspot/redirect/:mikrotikId", async (req, res) => {
   }
 });
 
-
-const cron = require('node-cron');
-const syncConnectionLogs = require('./src/jobs/syncConnectionLogs');
+const cron = require("node-cron");
+cron.schedule("15 3 * * *", () =>
+  require("./src/jobs/privacyRetention")().catch((e) =>
+    console.error("[retention]", e.message),
+  ),
+);
+const syncConnectionLogs = require("./src/jobs/syncConnectionLogs");
 
 // Sincronizar logs de conexão do RADIUS (Marco Civil) a cada 5 minutos
-cron.schedule('*/5 * * * *', () => {
-  console.log('[CRON] Iniciando syncConnectionLogs...');
-  syncConnectionLogs().catch(err => console.error('[CRON] Erro:', err));
+cron.schedule("*/5 * * * *", () => {
+  console.log("[CRON] Iniciando syncConnectionLogs...");
+  syncConnectionLogs().catch((err) => console.error("[CRON] Erro:", err));
 });
 
 // --- Tela de emergencia (SEM auth) ---
-app.get('/emergency', (req, res) => {
-  res.sendFile(path.join(__dirname, 'src/views/emergency.html'));
+app.get("/emergency", (req, res) => {
+  res.sendFile(path.join(__dirname, "src/views/emergency.html"));
 });
-const systemBackupCtrl = require('./src/controllers/systemBackupController');
-app.get('/api/emergency/backups', systemBackupCtrl.listarBackups);
-app.post('/api/emergency/backup', systemBackupCtrl.criarBackup);
-app.post('/api/emergency/restore/:id', systemBackupCtrl.restaurarBackup);
+const systemBackupCtrl = require("./src/controllers/systemBackupController");
+app.get("/api/emergency/backups", systemBackupCtrl.listarBackups);
+app.post("/api/emergency/backup", systemBackupCtrl.criarBackup);
+app.post("/api/emergency/restore/:id", systemBackupCtrl.restaurarBackup);
 
 app.listen(process.env.PORT || 3001, () => {
-  console.log(`API rodando na porta ${process.env.PORT || 3001}`)
-})
+  console.log(`API rodando na porta ${process.env.PORT || 3001}`);
+});

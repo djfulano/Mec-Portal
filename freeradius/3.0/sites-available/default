@@ -16,6 +16,7 @@ server default {
         mschap
         suffix
         sql
+        mec_portal
 
         # Contador diário - calcula tempo usado hoje
         dailycounter

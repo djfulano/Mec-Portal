@@ -11,6 +11,10 @@ module.exports = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    if (decoded.kind || !Number.isSafeInteger(Number(decoded.id)) || Number(decoded.id) < 1 || !['super_admin','owner','manager','operator'].includes(decoded.role)) {
+      return res.status(401).json({ error: 'Token administrativo inválido' });
+    }
+    decoded.id = Number(decoded.id);
     req.user = decoded
     next()
   } catch (err) {

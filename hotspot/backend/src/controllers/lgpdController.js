@@ -4,7 +4,8 @@ const { notificarLiberacao } = require("../services/whatsappNotify");
 
 exports.lgpdLogin = async (req, res) => {
   try {
-    const { cpf, aceite, mac, ip, email, nome, telefone, mikrotik_id } = req.body;
+    const { cpf, aceite, mac, ip, email, nome, telefone, mikrotik_id } =
+      req.body;
 
     if (aceite === undefined || !mac || !ip) {
       return res.status(400).json({ message: "Dados obrigatórios faltando" });
@@ -13,15 +14,18 @@ exports.lgpdLogin = async (req, res) => {
     // Resolver empresa_id via mikrotik_id (endpoint público)
     let empresaId = null;
     if (mikrotik_id) {
-      const [[mtk]] = await db.execute("SELECT empresa_id FROM mikrotiks WHERE id = ?", [mikrotik_id]);
+      const [[mtk]] = await db.execute(
+        "SELECT empresa_id FROM mikrotiks WHERE id = ?",
+        [mikrotik_id],
+      );
       empresaId = mtk?.empresa_id || null;
     }
 
     const aceiteInt = aceite ? 1 : 0;
     // Limpar caracteres especiais do CPF para usar como username RADIUS
-    const cpfLimpo = cpf ? cpf.replace(/\D/g, '') : null;
+    const cpfLimpo = cpf ? cpf.replace(/\D/g, "") : null;
     const username = cpfLimpo || mac;
-    const senha = cpfLimpo || mac;
+    const senha = require("crypto").randomBytes(24).toString("hex");
 
     // Busca plano LGPD da empresa ANTES de inserir registros
     let planoQuery = `
@@ -47,7 +51,12 @@ exports.lgpdLogin = async (req, res) => {
     if (cpf) {
       const existing = await verificarLeadExistente(cpfLimpo, empresaId);
       if (existing) {
-        return res.status(409).json({ message: "Este CPF já está cadastrado em nosso sistema.", duplicado: true });
+        return res
+          .status(409)
+          .json({
+            message: "Este CPF já está cadastrado em nosso sistema.",
+            duplicado: true,
+          });
       }
     }
 
@@ -55,7 +64,16 @@ exports.lgpdLogin = async (req, res) => {
     await db.execute(
       `INSERT INTO leads (empresa_id, nome, email, telefone, cpf, mac, ip, origem, lgpd_aceite, lgpd_aceite_em)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'lgpd', ?, NOW())`,
-      [empresaId, nome || null, email || null, telefone || null, cpf || null, mac, ip, aceiteInt]
+      [
+        empresaId,
+        nome || null,
+        email || null,
+        telefone || null,
+        cpf || null,
+        mac,
+        ip,
+        aceiteInt,
+      ],
     );
 
     // Remove autenticações antigas
@@ -64,10 +82,7 @@ exports.lgpdLogin = async (req, res) => {
     await db.query("DELETE FROM radusergroup WHERE username = ?", [username]);
 
     // Limpa sessões do dia
-    await db.query(
-      `DELETE FROM radacct WHERE username = ? AND acctstarttime >= CURDATE()`,
-      [username]
-    );
+    // Histórico RADIUS preservado: reconexões não apagam sessões.
 
     const rateLimit = `${plano.velocidade_up}M/${plano.velocidade_down}M`;
     const tempoSegundos = plano.duracao_minutos * 60;
@@ -79,30 +94,44 @@ exports.lgpdLogin = async (req, res) => {
        VALUES (?, 'Cleartext-Password', ':=', ?),
               (?, 'Max-Daily-Session', ':=', ?),
               (?, 'Simultaneous-Use', ':=', ?)`,
-      [username, senha, username, String(tempoSegundos), username, String(sharedUsers)]
+      [
+        username,
+        senha,
+        username,
+        String(tempoSegundos),
+        username,
+        String(sharedUsers),
+      ],
     );
 
     await db.query(
       `INSERT INTO radreply (username, attribute, op, value)
        VALUES (?, 'Mikrotik-Rate-Limit', ':=', ?),
               (?, 'Session-Timeout', ':=', ?)`,
-      [username, rateLimit, username, tempoSegundos]
+      [username, rateLimit, username, tempoSegundos],
     );
 
     await db.query(
       "INSERT INTO radusergroup (username, groupname) VALUES (?, ?)",
-      [username, plano.id]
+      [username, plano.id],
     );
 
     await db.query(
       `INSERT INTO radius_users (empresa_id, username, plano_id, nas_id)
        VALUES (?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE plano_id = VALUES(plano_id), nas_id = VALUES(nas_id), empresa_id = VALUES(empresa_id)`,
-      [empresaId, username, plano.id, plano.mikrotik_id]
+      [empresaId, username, plano.id, plano.mikrotik_id],
     );
 
+    await require("../services/bindLegacyNas")(
+      username,
+      plano.mikrotik_id,
+      empresaId,
+    );
     const gateway = plano.end_hotspot || ip;
-    const loginUrl = gateway ? `http://${gateway}/login?username=${username}&password=${senha}` : "";
+    const loginUrl = gateway
+      ? `http://${gateway}/login?username=${username}&password=${senha}`
+      : "";
 
     // Resolver portal_id LGPD da empresa para notificacao WhatsApp
     let portalId = null;
@@ -110,7 +139,7 @@ exports.lgpdLogin = async (req, res) => {
       try {
         const [[portalLgpd]] = await db.execute(
           "SELECT id FROM portais WHERE tipo = 'lgpd' AND empresa_id = ? LIMIT 1",
-          [empresaId]
+          [empresaId],
         );
         portalId = portalLgpd?.id || null;
       } catch (_) {}
@@ -134,12 +163,16 @@ exports.lgpdLogin = async (req, res) => {
         login_url: loginUrl,
         cpf: cpfLimpo || "",
       },
-    }).catch(err => console.warn("[lgpdLogin] notificarLiberacao falhou:", err.message));
+    }).catch((err) =>
+      console.warn("[lgpdLogin] notificarLiberacao falhou:", err.message),
+    );
 
     return res.json({ success: true, gateway, username, password: senha });
   } catch (err) {
     console.error("Erro LGPD Login:", err);
-    return res.status(500).json({ message: "Erro interno ao processar login LGPD" });
+    return res
+      .status(500)
+      .json({ message: "Erro interno ao processar login LGPD" });
   }
 };
 
@@ -147,7 +180,7 @@ exports.getAllLgpd = async (req, res) => {
   try {
     const [rows] = await db.query(
       "SELECT id, cpf, email, nome, telefone, mac, ip, lgpd_aceite as aceite, criado_em FROM leads WHERE empresa_id = ? AND origem = 'lgpd' ORDER BY criado_em DESC",
-      [req.empresa_id]
+      [req.empresa_id],
     );
     res.json(rows);
   } catch (err) {
@@ -158,7 +191,8 @@ exports.getAllLgpd = async (req, res) => {
 
 exports.lgpdCadastro = async (req, res) => {
   try {
-    const { cpf, aceite, mac, ip, nome, telefone, email, mikrotik_id } = req.body;
+    const { cpf, aceite, mac, ip, nome, telefone, email, mikrotik_id } =
+      req.body;
 
     if (!cpf || aceite === undefined) {
       return res.status(400).json({ message: "CPF e aceite são obrigatórios" });
@@ -166,7 +200,10 @@ exports.lgpdCadastro = async (req, res) => {
 
     let empresaId = null;
     if (mikrotik_id) {
-      const [[mtk]] = await db.execute("SELECT empresa_id FROM mikrotiks WHERE id = ?", [mikrotik_id]);
+      const [[mtk]] = await db.execute(
+        "SELECT empresa_id FROM mikrotiks WHERE id = ?",
+        [mikrotik_id],
+      );
       empresaId = mtk?.empresa_id || null;
     }
 
@@ -177,14 +214,28 @@ exports.lgpdCadastro = async (req, res) => {
       const cpfCheck = cpf.replace(/\D/g, "");
       const existing = await verificarLeadExistente(cpfCheck, empresaId);
       if (existing) {
-        return res.status(409).json({ message: "Este CPF já está cadastrado em nosso sistema.", duplicado: true });
+        return res
+          .status(409)
+          .json({
+            message: "Este CPF já está cadastrado em nosso sistema.",
+            duplicado: true,
+          });
       }
     }
 
     await db.execute(
       `INSERT INTO leads (empresa_id, nome, email, telefone, cpf, mac, ip, origem, lgpd_aceite, lgpd_aceite_em)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'lgpd', ?, NOW())`,
-      [empresaId, nome || null, email || null, telefone || null, cpf, mac || null, ip || null, aceiteInt]
+      [
+        empresaId,
+        nome || null,
+        email || null,
+        telefone || null,
+        cpf,
+        mac || null,
+        ip || null,
+        aceiteInt,
+      ],
     );
 
     res.json({ success: true, message: "Cadastro LGPD realizado com sucesso" });
