@@ -150,6 +150,10 @@ exports.vincularAdmin = async (req, res) => {
     const { admin_id, role } = req.body;
 
     if (!admin_id) return res.status(400).json({ message: "admin_id obrigatório" });
+    const [admins] = await db.execute('SELECT role FROM admins WHERE id = ?', [admin_id]);
+    if (!admins.length) return res.status(404).json({ message: "Usuário não encontrado" });
+    if (admins[0].role === 'super_admin') return res.status(400).json({ message: "Superadmins têm acesso global e não são vinculados a empresas." });
+    if (role && !['owner', 'manager', 'operator'].includes(role)) return res.status(400).json({ message: "Perfil inválido" });
 
     await db.execute(
       `INSERT INTO admin_empresas (admin_id, empresa_id, role) VALUES (?, ?, ?)

@@ -17,20 +17,22 @@ exports.login = async (req, res) => {
   // Buscar todas as empresas do usuário
   const empresas = await Admin.getEmpresas(user.id, user.role);
 
-  if (empresas.length === 0) {
+  if (empresas.length === 0 && user.role !== 'super_admin') {
     return res.status(403).json({ error: 'Você não possui vínculo com nenhuma empresa ativa' });
   }
 
   // Empresa ativa = a do JWT antigo (empresa_id do admin) ou primeira da lista
-  const empresaAtiva = empresas.find(e => e.id === user.empresa_id) || empresas[0] || null;
+  const requestedEmpresa = req.body.empresa_slug;
+  const empresaAtiva = user.role === 'super_admin' ? null : requestedEmpresa ? empresas.find(e => e.slug === requestedEmpresa) : empresas.find(e => e.id === user.empresa_id) || empresas[0] || null;
+  if (user.role !== 'super_admin' && !empresaAtiva) return res.status(403).json({ error: 'Você não tem acesso a esta empresa.' });
 
   const token = jwt.sign(
     {
       id: user.id,
       email: user.email,
-      empresa_id: empresaAtiva?.id || user.empresa_id,
-      empresa_slug: empresaAtiva?.slug || user.empresa_slug || 'default',
-      empresa_nome: empresaAtiva?.nome || user.empresa_nome || 'Empresa Padrão',
+      empresa_id: empresaAtiva?.id || null,
+      empresa_slug: empresaAtiva?.slug || null,
+      empresa_nome: empresaAtiva?.nome || null,
       role: user.role || 'operator'
     },
     process.env.JWT_SECRET,
@@ -52,9 +54,9 @@ exports.login = async (req, res) => {
       email: user.email,
       nome: user.nome,
       role: user.role || 'operator',
-      empresa_id: empresaAtiva?.id || user.empresa_id,
-      empresa_slug: empresaAtiva?.slug || user.empresa_slug || 'default',
-      empresa_nome: empresaAtiva?.nome || user.empresa_nome || 'Empresa Padrão'
+      empresa_id: empresaAtiva?.id || null,
+      empresa_slug: empresaAtiva?.slug || null,
+      empresa_nome: empresaAtiva?.nome || null
     },
     empresas,
     permissoes

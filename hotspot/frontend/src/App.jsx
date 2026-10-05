@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import Login from "./pages/admin/Login";
 import Dashboard from "./pages/admin/Dashboard";
@@ -41,8 +41,18 @@ import LoginHotspot from "./pages/public/LoginHotspot";
 // Componente de proteção
 const RotaPrivada = ({ children }) => {
   const { user, loading } = useAuth();
+  const { empresaSlug } = useParams();
   if (loading) return null;
   if (!user) return <Navigate to="/" />;
+  if (user.role !== 'super_admin' && empresaSlug !== user.empresa_slug) return <Navigate to={`/admin/${user.empresa_slug}`} replace />;
+  return children;
+};
+
+const RotaSuper = ({ children }) => {
+  const { user, loading, isSuperAdmin } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/" />;
+  if (!isSuperAdmin) return <Navigate to={`/admin/${user.empresa_slug}`} replace />;
   return children;
 };
 
@@ -51,7 +61,7 @@ const AdminRedirect = () => {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/" />;
-  return <Navigate to={`/admin/${user.empresa_slug}`} replace />;
+  return <Navigate to={user.role === 'super_admin' ? '/super' : `/admin/${user.empresa_slug}`} replace />;
 };
 
 function App() {
@@ -96,11 +106,12 @@ function App() {
       <Route path="/admin/:empresaSlug/campanhas/:id" element={<RotaPrivada><CampanhaEditor /></RotaPrivada>} />
 
       {/* Super Admin */}
-      <Route path="/super" element={<RotaPrivada><SuperDashboard /></RotaPrivada>} />
-      <Route path="/super/empresas" element={<RotaPrivada><Empresas /></RotaPrivada>} />
-      <Route path="/super/atualizar" element={<RotaPrivada><AtualizarSistema /></RotaPrivada>} />
-      <Route path="/super/backups" element={<RotaPrivada><Backups /></RotaPrivada>} />
-      <Route path="/super/publicar-atualizacao" element={<RotaPrivada><PublicarAtualizacao /></RotaPrivada>} />
+      <Route path="/super/usuarios" element={<RotaSuper><Usuarios global /></RotaSuper>} />
+      <Route path="/super" element={<RotaSuper><SuperDashboard /></RotaSuper>} />
+      <Route path="/super/empresas" element={<RotaSuper><Empresas /></RotaSuper>} />
+      <Route path="/super/atualizar" element={<RotaSuper><AtualizarSistema /></RotaSuper>} />
+      <Route path="/super/backups" element={<RotaSuper><Backups /></RotaSuper>} />
+      <Route path="/super/publicar-atualizacao" element={<RotaSuper><PublicarAtualizacao /></RotaSuper>} />
     </Routes>
   );
 }

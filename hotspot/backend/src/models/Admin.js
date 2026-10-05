@@ -34,9 +34,9 @@ const create = async (email, passwordHash, empresa_id, role = 'operator', nome =
   await conn.beginTransaction();
   const [result] = await conn.execute(
     'INSERT INTO admins (empresa_id, email, password, nome, role) VALUES (?, ?, ?, ?, ?)',
-    [empresa_id, email, passwordHash, nome, role]
+    [role === 'super_admin' ? null : empresa_id, email, passwordHash, nome, role]
   );
-  await conn.execute('INSERT INTO admin_empresas (admin_id, empresa_id, role) VALUES (?, ?, ?)', [result.insertId, empresa_id, role === 'super_admin' ? 'owner' : role]);
+  if (role !== 'super_admin') await conn.execute('INSERT INTO admin_empresas (admin_id, empresa_id, role) VALUES (?, ?, ?)', [result.insertId, empresa_id, role]);
   await conn.commit();
   return result.insertId;
   } catch (err) { await conn.rollback(); throw err; }

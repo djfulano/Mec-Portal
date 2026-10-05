@@ -1,3 +1,4 @@
+import Copyright from '../../components/Copyright';
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
@@ -81,6 +82,7 @@ export default function SuperDashboard() {
           <Link to="/super/empresas" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 text-sm">
             Gerenciar Empresas
           </Link>
+          <Link to="/super/usuarios" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 text-sm">Superadmins e usuários</Link>
           <Link to="/super/atualizar" className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 text-sm">
             Atualizar Sistema
           </Link>
@@ -148,6 +150,7 @@ export default function SuperDashboard() {
           </div>
         )}
       </div>
+      <Copyright />
     </div>
   );
 }

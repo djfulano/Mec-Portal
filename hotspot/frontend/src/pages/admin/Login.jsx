@@ -1,3 +1,4 @@
+import Copyright from '../../components/Copyright'
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -26,7 +27,7 @@ export default function Login() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, senha })
+        body: JSON.stringify({ email, senha, empresa_slug: params.get('empresa') || undefined })
       })
 
       const data = await res.json()
@@ -34,7 +35,7 @@ export default function Login() {
       if (res.ok) {
         login(data.token, data.user, data.empresas, data.permissoes)
         const slug = data.user?.empresa_slug || 'default'
-        navigate(`/admin/${slug}`)
+        navigate(data.user?.role === 'super_admin' ? '/super' : `/admin/${slug}`)
       } else {
         setErro(data.message || data.error || 'Erro ao fazer login')
       }
@@ -44,11 +45,11 @@ export default function Login() {
   }
 
   return (
-    <div className="flex items-center justify-center h-screen bg-[#0f111a]">
+    <div className="flex items-center justify-center flex-col min-h-screen bg-[#0f111a]">
       <form onSubmit={handleLogin} className="bg-[#1a1d27] border border-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm">
         <div className="mb-6 text-center">
           {empresa?.logo_url && <img src={empresa.logo_url} alt={`Logo de ${empresa.nome}`} className="max-h-28 max-w-full object-contain mx-auto mb-4" onError={() => setEmpresa(prev => ({ ...prev, logo_url: null }))} />}
-          <h2 className="text-2xl font-bold text-white">SpotControl Pro</h2>
+          <h2 className="text-2xl font-bold text-white">Mec Portal</h2>
 
         </div>
         {erro && <p className="text-red-400 text-sm mb-4">{erro}</p>}
@@ -83,6 +84,7 @@ export default function Login() {
         </button>
 
       </form>
+      <Copyright />
     </div>
   )
 }

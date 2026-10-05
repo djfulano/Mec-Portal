@@ -100,6 +100,7 @@ app.use("/api/whatsapp", auth, tenant, checkPermissao('configuracoes'), whatsapp
 app.use("/api/limpeza", auth, tenant, checkPermissao('configuracoes'), limpezaRoutes);
 app.use("/api/radius-logs", auth, tenant, checkPermissao('sessoeslog'), radiusLogsRoutes);
 app.use("/api/admins", auth, tenant, checkPermissao('usuarios'), adminUserRoutes);
+app.use('/api/global-admins', auth, require('./src/middleware/authorize')('super_admin'), adminUserRoutes);
 app.use("/api/wireguard", auth, tenant, checkPermissao('vpn'), wireguardRoutes);
 app.use("/api/portais", auth, tenant, checkPermissao('portais'), portalRoutes);
 app.use("/api/campanhas", auth, tenant, checkPermissao('portais'), campanhasRoutes);
