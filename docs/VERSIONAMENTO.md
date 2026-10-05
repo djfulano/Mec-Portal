@@ -1,8 +1,8 @@
 # Histórico de versões do Mec Portal
 
-A versão instalada aparece no rodapé do menu lateral. Clique nela para consultar as alterações de cada versão.
+A versão instalada aparece no rodapé do menu lateral, acima do e-mail e do botão Sair. Somente superadmins podem clicar nela para consultar o histórico. Os demais usuários veem apenas o texto da versão.
 
-O histórico começa com **1.0.0**, a entrega de empresas, unidades e portais em 05/10/2026. A versão **1.1.0** acrescenta a exibição da versão e o histórico no painel. As entregas anteriores não receberam números retroativamente.
+O histórico começa com **0.1.0 — Versão de testes**, em 05/10/2026, reunindo a entrega de empresas, unidades, portais e histórico de versões. Essa numeração substitui os rótulos iniciais 1.0.0 e 1.1.0 para indicar que o sistema ainda está em testes.
 
 ## Como registrar uma atualização
 

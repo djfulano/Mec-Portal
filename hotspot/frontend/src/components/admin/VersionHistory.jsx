@@ -1,8 +1,14 @@
 import { useRef } from "react";
 import releases from "../../releases.json";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function VersionHistory() {
   const dialog = useRef(null);
+  const { isSuperAdmin } = useAuth();
+  const label = `Versão ${releases[0].version} — Versão de testes`;
+  if (!isSuperAdmin) {
+    return <p className="mb-3 text-xs text-gray-400">{label}</p>;
+  }
   return (
     <>
       <button
@@ -12,7 +18,7 @@ export default function VersionHistory() {
         title="Ver histórico de versões"
         aria-haspopup="dialog"
       >
-        Versão {releases[0].version} · Histórico
+        {label}
       </button>
       <dialog
         ref={dialog}
