@@ -42,12 +42,12 @@ export default function SuperDashboard() {
             <p className="text-gray-500 mt-1">Gerenciamento da plataforma</p>
           </div>
           <div className="flex gap-3">
-            <Link
+            {user?.empresa_id && <Link
               to={`/admin/${user?.empresa_slug || 'default'}`}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 text-sm"
             >
               Meu Painel
-            </Link>
+            </Link>}
             <button
               onClick={() => { logout(); navigate("/"); }}
               className="px-4 py-2 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30 text-sm"

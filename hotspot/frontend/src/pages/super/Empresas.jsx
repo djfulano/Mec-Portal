@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function Empresas() {
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, switchEmpresa } = useAuth();
   const navigate = useNavigate();
   const [empresas, setEmpresas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -98,12 +98,12 @@ export default function Empresas() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Link
-                    to={`/admin/${e.slug}`}
+                    <button
+                      onClick={async () => { try { await switchEmpresa(e.id); navigate(`/admin/${e.slug}`); } catch (err) { alert(err.message || 'Erro ao acessar empresa'); } }}
                     className="px-3 py-1.5 bg-blue-600/20 text-blue-400 rounded text-sm hover:bg-blue-600/30"
                   >
                     Acessar
-                  </Link>
+                    </button>
                   <button
                     onClick={() => handleEdit(e)}
                     className="px-3 py-1.5 bg-yellow-600/20 text-yellow-400 rounded text-sm hover:bg-yellow-600/30"
